@@ -9,7 +9,6 @@ import (
 
 // OrganizationsModel is the Terraform model for organizations.
 type OrganizationsModel struct {
-	Schema    types.String `tfsdk:"__schema"`
 	CreatedAt types.String `tfsdk:"created_at"`
 	Domain    types.String `tfsdk:"domain"`
 	Id        types.String `tfsdk:"id"`
@@ -22,9 +21,6 @@ type OrganizationsModel struct {
 // ToClientModel converts a Terraform model to a client model.
 func (m *OrganizationsModel) ToClientModel() *client.OrgFullView {
 	out := &client.OrgFullView{}
-	if !m.Schema.IsNull() && !m.Schema.IsUnknown() {
-		out.Schema = m.Schema.ValueString()
-	}
 	if !m.CreatedAt.IsNull() && !m.CreatedAt.IsUnknown() {
 		out.CreatedAt = m.CreatedAt.ValueString()
 	}
@@ -51,7 +47,6 @@ func (m *OrganizationsModel) ToClientModel() *client.OrgFullView {
 
 // FromClientModel updates the Terraform model from a client model.
 func (m *OrganizationsModel) FromClientModel(c *client.OrgFullView) {
-	m.Schema = types.StringValue(c.Schema)
 	m.CreatedAt = types.StringValue(c.CreatedAt)
 	m.Domain = types.StringValue(c.Domain)
 	m.Id = types.StringValue(c.Id)

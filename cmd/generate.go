@@ -401,12 +401,17 @@ var generateTerraformOAGCmd = &cobra.Command{
 			return err
 		}
 
-		// Post-process: Huma adds a "$schema" property to response bodies. The
-		// OpenAPI Generator terraform-provider templates render that into Go
-		// identifiers like "$Schema" (struct field and all references), which is
-		// not a legal Go identifier and breaks the build. The Go SDK generator
-		// handles the same property fine by exporting it as "Schema" with a
-		// `json:"$schema"` tag, so we normalize the terraform output the same way.
+		// Post-process: Huma adds a "$schema" metadata property to response
+		// bodies. The OpenAPI Generator terraform-provider templates render it as
+		// a model field tagged tfsdk:"__schema" — which compiles but the plugin
+		// framework rejects at apply time ("invalid tfsdk tag, must start with a
+		// letter"). It is metadata, not a real resource attribute, so drop it
+		// entirely from the provider models, schema attributes, and mappings.
+		if err := dropTerraformSchemaField(outDir); err != nil {
+			return err
+		}
+		// Safety net for any other "$"-prefixed Go identifiers the generator may
+		// emit (the $schema field above is removed before this runs).
 		if err := patchTerraformDollarIdentifiers(outDir); err != nil {
 			return err
 		}
@@ -665,6 +670,58 @@ func copyTreeOverwrite(dst, src string) error {
 // field and its references. The match is intentionally restricted to "$" + an
 // uppercase letter so it never touches the lowercase "$schema" that legitimately
 // appears inside `json:"$schema,omitempty"` struct tags.
+// dropTerraformSchemaField removes Huma's injected "$schema" metadata field from
+// the generated provider tree. The generator renders it as a model field tagged
+// tfsdk:"__schema" (illegal — tfsdk tags must start with a letter), a schema
+// attribute block, and to/from client mapping lines. Removed rather than renamed
+// because it is metadata, not a real resource attribute.
+func dropTerraformSchemaField(outDir string) error {
+	res := []*regexp.Regexp{
+		// struct field:  Schema  types.String `tfsdk:"__schema"`
+		regexp.MustCompile("(?m)^[ \t]*Schema[ \t]+types\\.String[ \t]+`tfsdk:\"__schema\"`[ \t]*\n"),
+		// schema attribute block:  "__schema": schema.StringAttribute{ ... },
+		regexp.MustCompile("(?s)[ \t]*\"__schema\": schema\\.StringAttribute\\{.*?\\},\n"),
+		// ToClientModel guard block
+		regexp.MustCompile("(?s)[ \t]*if !m\\.Schema\\.IsNull\\(\\) && !m\\.Schema\\.IsUnknown\\(\\) \\{\n[ \t]*out\\.Schema = m\\.Schema\\.ValueString\\(\\)\n[ \t]*\\}\n"),
+		// FromClientModel assignment
+		regexp.MustCompile("(?m)^[ \t]*m\\.Schema = types\\.StringValue\\(c\\.Schema\\)\n"),
+	}
+
+	patched := 0
+	err := filepath.WalkDir(outDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+		out := b
+		for _, re := range res {
+			out = re.ReplaceAll(out, nil)
+		}
+		if string(out) == string(b) {
+			return nil
+		}
+		if err := os.WriteFile(path, out, 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", path, err)
+		}
+		log.Printf("patched %s: removed $schema metadata field", path)
+		patched++
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if patched == 0 {
+		log.Printf("note: no $schema field found under %s; skipping drop", outDir)
+	}
+	return nil
+}
+
 func patchTerraformDollarIdentifiers(outDir string) error {
 	dollarIdent := regexp.MustCompile(`\$([A-Z])`)
 

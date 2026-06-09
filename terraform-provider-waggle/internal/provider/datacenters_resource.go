@@ -33,10 +33,6 @@ func (r *DatacentersResource) Schema(_ context.Context, _ resource.SchemaRequest
 	resp.Schema = schema.Schema{
 		Description: "Manages a datacenters resource.",
 		Attributes: map[string]schema.Attribute{
-			"__schema": schema.StringAttribute{
-				Computed:    true,
-				Description: "A URL to the JSON Schema for this object.",
-			},
 			"created_at": schema.StringAttribute{
 				Computed:    true,
 				Description: "",

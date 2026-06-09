@@ -31,10 +31,6 @@ func (d *PoolsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		Description: "Fetches a pools data source.",
 		Attributes: map[string]schema.Attribute{
-			"__schema": schema.StringAttribute{
-				Computed:    true,
-				Description: "A URL to the JSON Schema for this object.",
-			},
 			"created_at": schema.StringAttribute{
 				Required:    true,
 				Description: "",

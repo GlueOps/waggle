@@ -31,10 +31,6 @@ func (d *HypervisorsDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 	resp.Schema = schema.Schema{
 		Description: "Fetches a hypervisors data source.",
 		Attributes: map[string]schema.Attribute{
-			"__schema": schema.StringAttribute{
-				Computed:    true,
-				Description: "A URL to the JSON Schema for this object.",
-			},
 			"cpu_bookable": schema.Int64Attribute{
 				Required:    true,
 				Description: "",
