@@ -51,8 +51,14 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 
 # ---- Stage 3: minimal runtime image -------------------------------------
-# distroless/static ships CA certificates + tzdata and runs as a non-root user.
-FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+# Alpine gives a shell so you can `docker exec <container> waggle migrate up`
+# (and run worker/encrypt/etc.) interactively. ca-certificates is required for
+# outbound TLS (Proxmox, SMTP); the binary is static (CGO disabled) so it runs
+# fine on musl.
+FROM alpine:3.21 AS runtime
+
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -S waggle && adduser -S -G waggle waggle
 
 # Bind to all interfaces and serve the embedded UI out of the box.
 ENV BIND_HOST=0.0.0.0 \
@@ -62,8 +68,9 @@ ENV BIND_HOST=0.0.0.0 \
 COPY --from=build /out/waggle /usr/local/bin/waggle
 
 EXPOSE 8080
-USER nonroot:nonroot
+USER waggle
 
+# waggle is on PATH, so `docker exec <container> waggle migrate up` works.
 ENTRYPOINT ["/usr/local/bin/waggle"]
 # Override with `worker`, `migrate`, etc. at `docker run`.
 CMD ["serve"]
