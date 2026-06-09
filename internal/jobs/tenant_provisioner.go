@@ -85,23 +85,26 @@ func (p *TenantProvisionerService) ProvisionOrganization(ctx context.Context, or
 		return fmt.Errorf("open admin db: %w", err)
 	}
 
-	log.Printf("tenant_provisioner: creating database %s", dbName)
-	if err := createDatabaseIfNotExists(ctx, adminSQL, dbName); err != nil {
+	appRole := dsnRole(tenantURL)
+
+	log.Printf("tenant_provisioner: creating database %s (owner=%q)", dbName, appRole)
+	if err := createDatabaseIfNotExists(ctx, adminSQL, dbName, appRole); err != nil {
 		adminSQL.Close()
 		return err
 	}
-	adminSQL.Close()
 
-	// Ensure the app role can create objects in the new tenant DB's public
-	// schema before goose runs. When the admin/owner role differs from the app
-	// role (e.g. a superuser ADMIN_DATABASE_URL), PostgreSQL 15+ would otherwise
-	// deny tenant migrations with "permission denied for schema public".
-	if appRole := dsnRole(tenantURL); appRole != "" {
-		log.Printf("tenant_provisioner: granting public schema on %s to %q", dbName, appRole)
-		if err := grantTenantPublicSchema(ctx, p.adminDBURL, dbName, appRole); err != nil {
+	// Make the app role own the tenant database (and thus its public schema, via
+	// pg_database_owner) so it can run migrations and own everything it creates.
+	// Also heals databases created before ownership was set. Requires the admin
+	// role to be able to SET ROLE to the app role (membership) or be a superuser.
+	if appRole != "" {
+		log.Printf("tenant_provisioner: setting owner of %s to %q", dbName, appRole)
+		if err := setDatabaseOwner(ctx, adminSQL, dbName, appRole); err != nil {
+			adminSQL.Close()
 			return err
 		}
 	}
+	adminSQL.Close()
 
 	tenantSQL, err := sql.Open("pgx", tenantURL)
 	if err != nil {
@@ -166,7 +169,7 @@ func runTenantMigrations(db *sql.DB) error {
 	return nil
 }
 
-func createDatabaseIfNotExists(ctx context.Context, adminDB *sql.DB, dbName string) error {
+func createDatabaseIfNotExists(ctx context.Context, adminDB *sql.DB, dbName, owner string) error {
 	var exists bool
 	if err := adminDB.QueryRowContext(
 		ctx,
@@ -180,8 +183,11 @@ func createDatabaseIfNotExists(ctx context.Context, adminDB *sql.DB, dbName stri
 		return nil
 	}
 
-	_, err := adminDB.ExecContext(ctx, `CREATE DATABASE `+quoteIdentifier(dbName))
-	if err != nil {
+	stmt := `CREATE DATABASE ` + quoteIdentifier(dbName)
+	if owner != "" {
+		stmt += ` OWNER ` + quoteIdentifier(owner)
+	}
+	if _, err := adminDB.ExecContext(ctx, stmt); err != nil {
 		return fmt.Errorf("create database %s: %w", dbName, err)
 	}
 	return nil
@@ -191,26 +197,15 @@ func quoteIdentifier(s string) string {
 	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }
 
-// grantTenantPublicSchema connects to the freshly created tenant database as the
-// admin/owner role and grants the app role full access to the public schema
-// (USAGE + CREATE), which is what goose needs to create goose_db_version and the
-// tenant tables. It is idempotent and a no-op cost when the admin and app roles
-// are the same (the app already owns the database it created).
-func grantTenantPublicSchema(ctx context.Context, adminURL, dbName, role string) error {
-	adminTenantURL, err := deriveAdminTenantDBURL(adminURL, dbName)
-	if err != nil {
-		return fmt.Errorf("derive admin url for %s: %w", dbName, err)
-	}
-
-	db, err := sql.Open("pgx", adminTenantURL)
-	if err != nil {
-		return fmt.Errorf("open admin connection to %s: %w", dbName, err)
-	}
-	defer db.Close()
-
-	stmt := "GRANT ALL ON SCHEMA public TO " + quoteIdentifier(role)
-	if _, err := db.ExecContext(ctx, stmt); err != nil {
-		return fmt.Errorf("grant public schema on %s to %s: %w", dbName, role, err)
+// setDatabaseOwner reassigns ownership of the tenant database to the app role,
+// so it owns the database and (via pg_database_owner) the public schema. This
+// lets the app role run migrations and own every object it creates, and heals
+// databases created before ownership was set. It is idempotent. The admin role
+// must be able to SET ROLE to the app role (membership) or be a superuser.
+func setDatabaseOwner(ctx context.Context, adminDB *sql.DB, dbName, owner string) error {
+	stmt := fmt.Sprintf("ALTER DATABASE %s OWNER TO %s", quoteIdentifier(dbName), quoteIdentifier(owner))
+	if _, err := adminDB.ExecContext(ctx, stmt); err != nil {
+		return fmt.Errorf("set owner of %s to %s: %w", dbName, owner, err)
 	}
 	return nil
 }
