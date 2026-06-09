@@ -34,6 +34,10 @@ var (
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "Run database migrations",
+	// Runtime failures (e.g. the schema-privilege preflight) print their own
+	// guidance via Execute's log.Fatal; don't bury it under a flag-usage dump.
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runMigrations(cmd.Context(), gooseAction{kind: "up"})
 	},
@@ -168,6 +172,11 @@ func runMigrations(ctx context.Context, action gooseAction) error {
 	}
 
 	if scope == "control" || scope == "all" {
+		if actionWritesSchema(action.kind) {
+			if err := preflightSchemaCreate(ctx, controlSQL, "control"); err != nil {
+				return err
+			}
+		}
 		log.Printf("Control DB: goose %s", action.kind)
 		if err := runGooseAction(controlSQL, migrations.ControlFS, "control", action); err != nil {
 			return fmt.Errorf("control migrations failed: %w", err)
@@ -202,6 +211,14 @@ func runMigrations(ctx context.Context, action gooseAction) error {
 			if err != nil {
 				log.Printf("Failed to connect tenant DB %s: %v", org.ID, err)
 				continue
+			}
+
+			if actionWritesSchema(action.kind) {
+				if err := preflightSchemaCreate(ctx, tenantSQL, fmt.Sprintf("tenant %s (%s)", org.Name, org.ID)); err != nil {
+					log.Printf("%v", err)
+					_ = tenantSQL.Close()
+					continue
+				}
 			}
 
 			if err := runGooseAction(tenantSQL, migrations.TenantFS, "tenant", action); err != nil {
@@ -261,6 +278,82 @@ func runGooseAction(db *sql.DB, base fs.FS, dir string, action gooseAction) erro
 	default:
 		return fmt.Errorf("unknown goose action: %s", action.kind)
 	}
+}
+
+// actionWritesSchema reports whether a goose action creates or drops objects
+// (and therefore needs the goose_db_version table, which requires CREATE on the
+// public schema). Pure read actions are excluded so they don't trip the
+// preflight on a role that only has read access.
+func actionWritesSchema(kind string) bool {
+	switch kind {
+	case "status", "version":
+		return false
+	default:
+		return true
+	}
+}
+
+// preflightSchemaCreate verifies the connected role can create objects in the
+// "public" schema before goose tries to create goose_db_version. PostgreSQL 15+
+// no longer grants CREATE on "public" to non-owner roles, and
+// GRANT ALL PRIVILEGES ON DATABASE does not cover schema-level privileges — so
+// this is the most common cause of "permission denied for schema public" on a
+// freshly provisioned database. When it can't run the check itself, it logs and
+// lets goose surface the real error rather than blocking.
+func preflightSchemaCreate(ctx context.Context, db *sql.DB, label string) error {
+	const q = `
+SELECT current_user,
+       current_database(),
+       EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'public'),
+       CASE WHEN EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'public')
+            THEN has_schema_privilege(current_user, 'public', 'CREATE')
+            ELSE NULL END`
+
+	var (
+		user     string
+		database string
+		schemaOK bool
+		createOK sql.NullBool
+	)
+	if err := db.QueryRowContext(ctx, q).Scan(&user, &database, &schemaOK, &createOK); err != nil {
+		log.Printf("Preflight (%s): could not check schema privileges (%v); continuing", label, err)
+		return nil
+	}
+
+	if !schemaOK {
+		return fmt.Errorf("%s database %s has no \"public\" schema.\n\n"+
+			"Create it (as a superuser or the database owner) and hand ownership to the app role:\n\n"+
+			"    \\c %s\n"+
+			"    CREATE SCHEMA public AUTHORIZATION %s;\n\n"+
+			"Then re-run: waggle migrate",
+			label, quoteIdent(database), quoteIdent(database), quoteIdent(user))
+	}
+	if createOK.Valid && createOK.Bool {
+		return nil
+	}
+
+	return fmt.Errorf("role %s cannot CREATE in schema \"public\" of %s database %s.\n\n"+
+		"PostgreSQL 15+ does not grant CREATE on the \"public\" schema to non-owner roles, and\n"+
+		"GRANT ALL PRIVILEGES ON DATABASE does not cover schema-level privileges.\n\n"+
+		"Fix it with ONE of the following, connected as a superuser or the database owner:\n\n"+
+		"    -- Option A (recommended): make the role own the database, so it owns \"public\":\n"+
+		"    ALTER DATABASE %s OWNER TO %s;\n\n"+
+		"    -- Option B: grant CREATE on the public schema (run while connected to %s):\n"+
+		"    \\c %s\n"+
+		"    GRANT ALL ON SCHEMA public TO %s;\n\n"+
+		"Per-tenant provisioning also needs the role to create databases:\n"+
+		"    ALTER ROLE %s CREATEDB;\n\n"+
+		"Then re-run: waggle migrate",
+		quoteIdent(user), label, quoteIdent(database),
+		quoteIdent(database), quoteIdent(user),
+		quoteIdent(database), quoteIdent(database), quoteIdent(user),
+		quoteIdent(user))
+}
+
+// quoteIdent double-quotes a SQL identifier so the remediation snippets are
+// safe to copy-paste verbatim.
+func quoteIdent(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }
 
 func runRiver(ctx context.Context, controlSQL *sql.DB, action gooseAction) error {
@@ -364,4 +457,12 @@ func init() {
 	migrateCmd.AddCommand(newMigrateResetCmd())
 	migrateCmd.AddCommand(newMigrateStatusCmd())
 	migrateCmd.AddCommand(newMigrateVersionCmd())
+
+	// Cobra only consults the executed command (and the root) for these flags,
+	// so propagate them to every subcommand — otherwise a runtime failure like
+	// the schema-privilege preflight gets buried under a flag-usage dump.
+	for _, c := range migrateCmd.Commands() {
+		c.SilenceUsage = true
+		c.SilenceErrors = true
+	}
 }
