@@ -1,0 +1,69 @@
+# syntax=docker/dockerfile:1
+
+# ---- Stage 1: build the frontend ----------------------------------------
+# Produces ui/dist, which is embedded into the Go binary via go:embed.
+FROM node:24-bookworm-slim AS ui
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+WORKDIR /ui
+
+# Install deps first so this layer caches unless the lockfile changes.
+COPY ui/package.json ui/yarn.lock ./
+RUN corepack enable && corepack prepare yarn@1.22.22 --activate \
+    && yarn install --frozen-lockfile
+
+# Build the SPA (tsc -b && vite build) -> /ui/dist
+COPY ui/ ./
+RUN yarn build
+
+
+# ---- Stage 2: build the Go binary ---------------------------------------
+# CGO is disabled so the result is a fully static binary for a scratch/distroless
+# runtime. Version metadata is injected via -ldflags.
+FROM golang:1.26-bookworm AS build
+WORKDIR /src
+
+# Download modules first for layer caching.
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+# Application source.
+COPY . .
+
+# Drop in the freshly built UI so go:embed picks up the latest assets.
+COPY --from=ui /ui/dist ./ui/dist
+
+ARG VERSION=dev
+ARG COMMIT=none
+ARG DATE=unknown
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+    go build -trimpath \
+      -ldflags "-s -w \
+        -X github.com/glueops/waggle/cmd.version=${VERSION} \
+        -X github.com/glueops/waggle/cmd.commit=${COMMIT} \
+        -X github.com/glueops/waggle/cmd.date=${DATE}" \
+      -o /out/waggle .
+
+
+# ---- Stage 3: minimal runtime image -------------------------------------
+# distroless/static ships CA certificates + tzdata and runs as a non-root user.
+FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+
+# Bind to all interfaces and serve the embedded UI out of the box.
+ENV BIND_HOST=0.0.0.0 \
+    BIND_PORT=8080 \
+    FRONTEND_MODE=embed
+
+COPY --from=build /out/waggle /usr/local/bin/waggle
+
+EXPOSE 8080
+USER nonroot:nonroot
+
+ENTRYPOINT ["/usr/local/bin/waggle"]
+# Override with `worker`, `migrate`, etc. at `docker run`.
+CMD ["serve"]

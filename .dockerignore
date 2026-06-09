@@ -1,0 +1,29 @@
+# Keep the build context small and deterministic. Build artifacts are produced
+# inside the image, not copied from the host.
+
+.git
+.github
+.idea
+.vscode
+.claude
+
+# Secrets / local env
+.env
+.env.*
+
+# Go build output
+/bin
+/waggle
+/dist
+
+# Node / frontend — reinstalled and rebuilt inside the UI stage
+node_modules
+ui/node_modules
+ui/dist
+
+# Docs, tooling scratch, and misc
+docs
+*.md
+repomix-output.*
+repomix-readme.md
+.DS_Store
