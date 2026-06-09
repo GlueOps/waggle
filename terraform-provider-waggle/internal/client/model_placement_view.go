@@ -5,9 +5,9 @@ package client
 // PlacementView - PlacementView struct
 type PlacementView struct {
 	Schema string `json:"$schema,omitempty"`
-	CreatedAt string `json:"created_at"`
+	CreatedAt string `json:"created_at,omitempty"`
 	HypervisorId string `json:"hypervisor_id"`
 	HypervisorName string `json:"hypervisor_name"`
-	Id string `json:"id"`
+	Id string `json:"id,omitempty"`
 	Vmid int64 `json:"vmid,omitempty"`
 }

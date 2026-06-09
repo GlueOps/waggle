@@ -5,5 +5,5 @@ package client
 // UpdateMemberInputBody - UpdateMemberInputBody struct
 type UpdateMemberInputBody struct {
 	Schema string `json:"$schema,omitempty"`
-	Role string `json:"role"`
+	Role string `json:"role,omitempty"`
 }

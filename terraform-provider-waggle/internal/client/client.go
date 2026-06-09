@@ -54,7 +54,7 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body interf
 	if c.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	} else if c.ApiKey != "" {
-		req.Header.Set("Authorization", c.ApiKey)
+		req.Header.Set("Authorization", "Bearer "+c.ApiKey)
 	} else if c.Username != "" {
 		req.SetBasicAuth(c.Username, c.Password)
 	}

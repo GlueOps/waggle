@@ -5,11 +5,11 @@ package client
 // DatacenterView - DatacenterView struct
 type DatacenterView struct {
 	Schema string `json:"$schema,omitempty"`
-	CreatedAt string `json:"created_at"`
-	HasToken bool `json:"has_token"`
-	Id string `json:"id"`
+	CreatedAt string `json:"created_at,omitempty"`
+	HasToken bool `json:"has_token,omitempty"`
+	Id string `json:"id,omitempty"`
 	InsecureSkipVerify bool `json:"insecure_skip_verify"`
 	Name string `json:"name"`
-	UpdatedAt string `json:"updated_at"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 	Url string `json:"url"`
 }

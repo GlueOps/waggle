@@ -5,12 +5,12 @@ package client
 // PoolView - PoolView struct
 type PoolView struct {
 	Schema string `json:"$schema,omitempty"`
-	CreatedAt string `json:"created_at"`
+	CreatedAt string `json:"created_at,omitempty"`
 	DatacenterId string `json:"datacenter_id"`
 	DesiredCount int64 `json:"desired_count"`
-	Id string `json:"id"`
+	Id string `json:"id,omitempty"`
 	Metadata interface{} `json:"metadata,omitempty"`
 	Name string `json:"name"`
 	SlotId string `json:"slot_id"`
-	UpdatedAt string `json:"updated_at"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 }

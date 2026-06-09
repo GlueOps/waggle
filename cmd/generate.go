@@ -416,6 +416,17 @@ var generateTerraformOAGCmd = &cobra.Command{
 			return err
 		}
 
+		// Auth + request-body fixes for the strict Huma API: send the org API key
+		// as a Bearer token (the API's only scheme), and omitempty the read-only,
+		// server-assigned fields so create/update bodies don't carry properties
+		// the API rejects with 422 ("unexpected property").
+		if err := patchTerraformAPIKeyBearer(outDir); err != nil {
+			return err
+		}
+		if err := patchClientReadOnlyOmitempty(outDir); err != nil {
+			return err
+		}
+
 		// Correct resource attribute roles: the generator marks every field
 		// Required, forcing server-assigned fields (id, created_at, ...) into
 		// config and causing perpetual diffs. Reclassify per the spec.
@@ -718,6 +729,84 @@ func dropTerraformSchemaField(outDir string) error {
 	}
 	if patched == 0 {
 		log.Printf("note: no $schema field found under %s; skipping drop", outDir)
+	}
+	return nil
+}
+
+// patchTerraformAPIKeyBearer makes the generated client send the configured
+// api_key as a Bearer token. The OpenAPI Generator emits a raw
+// `Authorization: <api_key>` header, but Waggle's only auth scheme is HTTP
+// bearer (a wgl_ org key is recognized as a bearer token), so without the
+// prefix the API returns 401 "missing bearer token".
+func patchTerraformAPIKeyBearer(outDir string) error {
+	path := filepath.Join(outDir, "internal", "client", "client.go")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+	patched := strings.ReplaceAll(string(b),
+		`req.Header.Set("Authorization", c.ApiKey)`,
+		`req.Header.Set("Authorization", "Bearer "+c.ApiKey)`)
+	if patched == string(b) {
+		log.Printf("note: api_key Authorization line not found in %s; skipping", path)
+		return nil
+	}
+	if err := os.WriteFile(path, []byte(patched), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	log.Printf("patched %s: send api_key as Bearer token", path)
+	return nil
+}
+
+// patchClientReadOnlyOmitempty adds ",omitempty" to the json tags of read-only
+// (server-assigned) fields in the generated client models. Create/update bodies
+// are built from the response view models, so without this the empty read-only
+// fields (id, created_at, ...) are marshaled into the request and the strict
+// Huma API rejects them with 422 "unexpected property". The set is derived from
+// resourceSchemaRoles so it stays in sync with the schema-role classification.
+func patchClientReadOnlyOmitempty(outDir string) error {
+	readOnly := map[string]bool{}
+	for _, fields := range resourceSchemaRoles {
+		for name, role := range fields {
+			if role == roleComputed {
+				readOnly[name] = true
+			}
+		}
+	}
+
+	clientDir := filepath.Join(outDir, "internal", "client")
+	patched := 0
+	err := filepath.WalkDir(clientDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+		s := string(b)
+		orig := s
+		for name := range readOnly {
+			s = strings.ReplaceAll(s, `json:"`+name+`"`, `json:"`+name+`,omitempty"`)
+		}
+		if s == orig {
+			return nil
+		}
+		if err := os.WriteFile(path, []byte(s), 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", path, err)
+		}
+		log.Printf("patched %s: omitempty on read-only fields", path)
+		patched++
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if patched == 0 {
+		log.Printf("note: no read-only json tags found under %s; skipping", clientDir)
 	}
 	return nil
 }

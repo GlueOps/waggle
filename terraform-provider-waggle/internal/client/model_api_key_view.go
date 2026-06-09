@@ -4,9 +4,9 @@ package client
 
 // ApiKeyView - ApiKeyView struct
 type ApiKeyView struct {
-	CreatedAt string `json:"created_at"`
+	CreatedAt string `json:"created_at,omitempty"`
 	ExpiresAt string `json:"expires_at,omitempty"`
-	Id string `json:"id"`
+	Id string `json:"id,omitempty"`
 	LastUsedAt string `json:"last_used_at,omitempty"`
 	Name string `json:"name"`
 	Prefix string `json:"prefix"`

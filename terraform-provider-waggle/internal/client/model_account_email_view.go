@@ -5,7 +5,7 @@ package client
 // AccountEmailView - AccountEmailView struct
 type AccountEmailView struct {
 	Email string `json:"email"`
-	Id string `json:"id"`
+	Id string `json:"id,omitempty"`
 	IsPrimary bool `json:"is_primary"`
 	VerifiedAt string `json:"verified_at,omitempty"`
 }

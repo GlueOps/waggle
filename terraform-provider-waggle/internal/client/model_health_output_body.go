@@ -5,5 +5,5 @@ package client
 // HealthOutputBody - HealthOutputBody struct
 type HealthOutputBody struct {
 	Schema string `json:"$schema,omitempty"`
-	Status string `json:"status"`
+	Status string `json:"status,omitempty"`
 }

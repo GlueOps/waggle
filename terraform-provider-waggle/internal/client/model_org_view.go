@@ -4,7 +4,7 @@ package client
 
 // OrgView - OrgView struct
 type OrgView struct {
-	Id string `json:"id"`
-	Slug string `json:"slug"`
-	Status string `json:"status"`
+	Id string `json:"id,omitempty"`
+	Slug string `json:"slug,omitempty"`
+	Status string `json:"status,omitempty"`
 }

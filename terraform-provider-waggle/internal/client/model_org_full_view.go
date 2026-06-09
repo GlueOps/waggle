@@ -5,11 +5,11 @@ package client
 // OrgFullView - OrgFullView struct
 type OrgFullView struct {
 	Schema string `json:"$schema,omitempty"`
-	CreatedAt string `json:"created_at"`
+	CreatedAt string `json:"created_at,omitempty"`
 	Domain string `json:"domain,omitempty"`
-	Id string `json:"id"`
+	Id string `json:"id,omitempty"`
 	Name string `json:"name"`
-	Role string `json:"role"`
-	Slug string `json:"slug"`
-	Status string `json:"status"`
+	Role string `json:"role,omitempty"`
+	Slug string `json:"slug,omitempty"`
+	Status string `json:"status,omitempty"`
 }

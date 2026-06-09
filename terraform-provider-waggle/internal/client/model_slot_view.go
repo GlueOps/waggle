@@ -5,11 +5,11 @@ package client
 // SlotView - SlotView struct
 type SlotView struct {
 	Schema string `json:"$schema,omitempty"`
-	CreatedAt string `json:"created_at"`
+	CreatedAt string `json:"created_at,omitempty"`
 	DiskGb int64 `json:"disk_gb"`
-	Id string `json:"id"`
+	Id string `json:"id,omitempty"`
 	Name string `json:"name"`
 	RamGb int64 `json:"ram_gb"`
-	UpdatedAt string `json:"updated_at"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 	Vcpu int64 `json:"vcpu"`
 }

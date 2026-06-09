@@ -5,23 +5,23 @@ package client
 // HypervisorView - HypervisorView struct
 type HypervisorView struct {
 	Schema string `json:"$schema,omitempty"`
-	CpuBookable int64 `json:"cpu_bookable"`
+	CpuBookable int64 `json:"cpu_bookable,omitempty"`
 	CpuReserved int64 `json:"cpu_reserved"`
 	CpuTotal int64 `json:"cpu_total"`
-	CpuUsed int64 `json:"cpu_used"`
-	CreatedAt string `json:"created_at"`
+	CpuUsed int64 `json:"cpu_used,omitempty"`
+	CreatedAt string `json:"created_at,omitempty"`
 	DatacenterId string `json:"datacenter_id"`
-	DiskGbBookable int64 `json:"disk_gb_bookable"`
+	DiskGbBookable int64 `json:"disk_gb_bookable,omitempty"`
 	DiskGbReserved int64 `json:"disk_gb_reserved"`
 	DiskGbTotal int64 `json:"disk_gb_total"`
-	DiskGbUsed int64 `json:"disk_gb_used"`
-	Id string `json:"id"`
+	DiskGbUsed int64 `json:"disk_gb_used,omitempty"`
+	Id string `json:"id,omitempty"`
 	LastSyncedAt string `json:"last_synced_at,omitempty"`
 	Name string `json:"name"`
-	RamGbBookable int64 `json:"ram_gb_bookable"`
+	RamGbBookable int64 `json:"ram_gb_bookable,omitempty"`
 	RamGbReserved int64 `json:"ram_gb_reserved"`
 	RamGbTotal int64 `json:"ram_gb_total"`
-	RamGbUsed int64 `json:"ram_gb_used"`
+	RamGbUsed int64 `json:"ram_gb_used,omitempty"`
 	Schedulable bool `json:"schedulable"`
-	UpdatedAt string `json:"updated_at"`
+	UpdatedAt string `json:"updated_at,omitempty"`
 }

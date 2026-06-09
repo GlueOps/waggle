@@ -6,12 +6,12 @@ package client
 type MemberJsonView struct {
 	Schema string `json:"$schema,omitempty"`
 	AccountId string `json:"account_id"`
-	CreatedAt string `json:"created_at"`
+	CreatedAt string `json:"created_at,omitempty"`
 	DisplayName string `json:"display_name"`
 	Email string `json:"email"`
 	IsActive bool `json:"is_active"`
 	LastLoginAt string `json:"last_login_at,omitempty"`
 	Pending bool `json:"pending"`
-	Role string `json:"role"`
+	Role string `json:"role,omitempty"`
 	UserId string `json:"user_id"`
 }
