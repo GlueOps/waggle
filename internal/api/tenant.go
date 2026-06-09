@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -615,6 +616,8 @@ func mapFleetError(err error) error {
 		return huma.Error422UnprocessableEntity("invalid input")
 	case errors.Is(err, database.ErrTenantNotProvisioned), errors.Is(err, database.ErrTenantNotActive):
 		return huma.Error503ServiceUnavailable("tenant database not ready; provisioning may still be in progress")
+	case errors.Is(err, database.ErrOrgNotFound):
+		return huma.Error401Unauthorized("organization no longer exists; please re-authenticate")
 	case errors.Is(err, service.ErrDiscovery):
 		return huma.Error502BadGateway("could not reach the Proxmox cluster for discovery")
 	}
@@ -622,5 +625,8 @@ func mapFleetError(err error) error {
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return huma.Error409Conflict("a resource with that unique value already exists")
 	}
+	// Unmapped: surface a generic 500 to the client but log the real cause so
+	// these aren't opaque in the API logs.
+	log.Printf("fleet: unhandled error -> 500: %v", err)
 	return huma.Error500InternalServerError("internal error")
 }

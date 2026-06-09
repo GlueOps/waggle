@@ -18,6 +18,10 @@ import (
 var (
 	ErrTenantNotProvisioned = errors.New("tenant database not provisioned")
 	ErrTenantNotActive      = errors.New("tenant not active")
+	// ErrOrgNotFound means the organization referenced by the caller (e.g. a
+	// token's org claim) no longer exists in the control DB — typically a stale
+	// token after the org was deleted or the control DB was reset.
+	ErrOrgNotFound = errors.New("organization not found")
 )
 
 type TenantManager struct {
@@ -62,6 +66,9 @@ func (tm *TenantManager) For(ctx context.Context, orgID uuid.UUID) (*gorm.DB, er
 
 	var org control.Organization
 	if err := tm.ControlDB.WithContext(ctx).First(&org, "id = ?", orgID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: %s", ErrOrgNotFound, orgID)
+		}
 		return nil, fmt.Errorf("load organization %s: %w", orgID, err)
 	}
 
@@ -101,6 +108,9 @@ func (tm *TenantManager) TenantDEK(ctx context.Context, orgID uuid.UUID) ([]byte
 	}
 	var org control.Organization
 	if err := tm.ControlDB.WithContext(ctx).First(&org, "id = ?", orgID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: %s", ErrOrgNotFound, orgID)
+		}
 		return nil, fmt.Errorf("load organization %s: %w", orgID, err)
 	}
 	if org.EncryptedTenantKey == "" || org.TenantKeyIV == "" || org.TenantKeyTag == "" {
