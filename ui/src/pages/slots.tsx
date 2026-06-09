@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { CopyId } from "@/components/ui/copy-id"
 import { FormDialog } from "@/components/crud/form-dialog"
 import { RowActions } from "@/components/crud/row-actions"
 import { PageShell } from "@/components/crud/page-shell"
@@ -102,6 +103,7 @@ export function SlotsPage() {
             <TableHead>vCPU</TableHead>
             <TableHead>RAM (GB)</TableHead>
             <TableHead>Disk (GB)</TableHead>
+            <TableHead>ID</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
@@ -112,6 +114,7 @@ export function SlotsPage() {
               <TableCell>{s.vcpu}</TableCell>
               <TableCell>{s.ram_gb}</TableCell>
               <TableCell>{s.disk_gb}</TableCell>
+              <TableCell><CopyId id={s.id} /></TableCell>
               <TableCell>
                 <RowActions
                   actions={[

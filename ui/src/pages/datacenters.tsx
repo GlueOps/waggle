@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { CopyId } from "@/components/ui/copy-id"
 import { FormDialog } from "@/components/crud/form-dialog"
 import { RowActions } from "@/components/crud/row-actions"
 import { PageShell } from "@/components/crud/page-shell"
@@ -131,6 +132,7 @@ export function DatacentersPage() {
             <TableHead>Name</TableHead>
             <TableHead>URL</TableHead>
             <TableHead>Token</TableHead>
+            <TableHead>ID</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
@@ -151,6 +153,7 @@ export function DatacentersPage() {
                   <Badge variant="outline">none</Badge>
                 )}
               </TableCell>
+              <TableCell><CopyId id={dc.id} /></TableCell>
               <TableCell>
                 <RowActions
                   actions={[

@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { CopyId } from "@/components/ui/copy-id"
 import { FormDialog } from "@/components/crud/form-dialog"
 import { RowActions } from "@/components/crud/row-actions"
 import { PageShell } from "@/components/crud/page-shell"
@@ -117,6 +118,7 @@ export function HypervisorsPage() {
             <TableHead>RAM GB (free/total)</TableHead>
             <TableHead>Disk GB (free/total)</TableHead>
             <TableHead>Schedulable</TableHead>
+            <TableHead>ID</TableHead>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
@@ -133,6 +135,7 @@ export function HypervisorsPage() {
                   onCheckedChange={(c) => void toggleSchedulable(hv, c)}
                 />
               </TableCell>
+              <TableCell><CopyId id={hv.id} /></TableCell>
               <TableCell>
                 <RowActions
                   actions={[
