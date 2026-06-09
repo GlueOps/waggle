@@ -57,7 +57,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # fine on musl.
 FROM alpine:3.21 AS runtime
 
-RUN apk add --no-cache ca-certificates tzdata \
+# postgresql-client provides `psql`, which the `waggle psql` subcommand execs.
+RUN apk add --no-cache ca-certificates tzdata postgresql-client \
     && addgroup -S waggle && adduser -S -G waggle waggle
 
 # Bind to all interfaces and serve the embedded UI out of the box.
