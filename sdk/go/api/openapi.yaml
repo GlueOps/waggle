@@ -1,0 +1,2925 @@
+openapi: 3.1.0
+info:
+  description: Waggle API.
+  title: Waggle
+  version: 0.1.0
+servers:
+- url: /api/v1
+paths:
+  /api-keys:
+    get:
+      operationId: list-api-keys
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAPIKeysOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: List the organization's API keys (secrets are never returned).
+      tags:
+      - api-keys
+    post:
+      operationId: create-api-key
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAPIKeyInputBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAPIKeyOutputBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Mint an organization API key for automation (e.g. Terraform). The plaintext
+        token is returned once.
+      tags:
+      - api-keys
+  /api-keys/{id}:
+    delete:
+      operationId: revoke-api-key
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Revoke an organization API key. Idempotent from the caller's view.
+      tags:
+      - api-keys
+  /auth/accept-invite:
+    post:
+      operationId: auth-accept-invite
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptInviteInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: "Accept an organization invite: set a password (if new) and sign in\
+        \ to the org."
+      tags:
+      - auth
+  /auth/login:
+    post:
+      operationId: auth-login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Exchange credentials for an access + refresh token. Returns membership
+        list when no organization_id is given and multiple memberships exist.
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      operationId: auth-logout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutInputBody"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Revoke the supplied refresh token's session. Idempotent.
+      tags:
+      - auth
+  /auth/me:
+    get:
+      operationId: auth-me
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: "Return the authenticated account, its verified-or-pending emails,\
+        \ and its org memberships."
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      operationId: auth-refresh
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: "Rotate a refresh token, returning a new access + refresh pair."
+      tags:
+      - auth
+  /auth/signup:
+    post:
+      operationId: auth-signup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignupOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: "Create an account, organization, and first user; enqueue tenant provisioning."
+      tags:
+      - auth
+  /auth/switch:
+    post:
+      operationId: auth-switch-org
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwitchOrgInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Issue a new token pair scoped to another organization the account belongs
+        to.
+      tags:
+      - auth
+  /auth/verify-email:
+    post:
+      operationId: auth-verify-email
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailInputBody"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Consume a verification token to mark an email address verified. Idempotent.
+      tags:
+      - auth
+  /datacenters:
+    get:
+      operationId: list-datacenters
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatacenterListOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: List datacenters in the caller's tenant.
+      tags:
+      - fleet
+    post:
+      operationId: create-datacenter
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatacenterBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatacenterView"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Create a datacenter in the caller's tenant.
+      tags:
+      - fleet
+  /datacenters/{id}:
+    delete:
+      operationId: delete-datacenter
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Delete a datacenter.
+      tags:
+      - fleet
+    get:
+      operationId: get-datacenter
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatacenterView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Fetch a datacenter by ID.
+      tags:
+      - fleet
+    put:
+      operationId: update-datacenter
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatacenterBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatacenterView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Update a datacenter.
+      tags:
+      - fleet
+  /datacenters/{id}/discover:
+    post:
+      operationId: discover-hypervisors
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoverInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoverOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Discover hypervisors from the datacenter's Proxmox cluster and upsert
+        them (preserving reserved capacity and schedulable). Set async to run in the
+        background.
+      tags:
+      - fleet
+  /health:
+    get:
+      operationId: health
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Health check
+      tags:
+      - system
+  /hypervisors:
+    get:
+      operationId: list-hypervisors
+      parameters:
+      - explode: false
+        in: query
+        name: datacenter_id
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HypervisorListOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: List hypervisors in the caller's tenant.
+      tags:
+      - fleet
+    post:
+      operationId: create-hypervisor
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HypervisorBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HypervisorView"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Create a hypervisor in the caller's tenant.
+      tags:
+      - fleet
+  /hypervisors/{id}:
+    delete:
+      operationId: delete-hypervisor
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Delete a hypervisor.
+      tags:
+      - fleet
+    get:
+      operationId: get-hypervisor
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HypervisorView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Fetch a hypervisor by ID.
+      tags:
+      - fleet
+    put:
+      operationId: update-hypervisor
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HypervisorBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HypervisorView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Update a hypervisor.
+      tags:
+      - fleet
+  /organizations:
+    get:
+      operationId: list-orgs
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgListOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: List the organizations the caller belongs to (with their role).
+      tags:
+      - organizations
+    post:
+      operationId: create-org
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrgInputBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgFullView"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Create an organization (you become its owner) and enqueue tenant provisioning.
+      tags:
+      - organizations
+  /organizations/{id}:
+    delete:
+      operationId: delete-org
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Delete an organization and enqueue tenant teardown (owner only).
+      tags:
+      - organizations
+    get:
+      operationId: get-org
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgFullView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Get an organization the caller belongs to.
+      tags:
+      - organizations
+    patch:
+      operationId: update-org
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrgInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgFullView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Rename an organization (admin or owner).
+      tags:
+      - organizations
+  /organizations/{id}/members:
+    get:
+      operationId: list-members
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberListOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: List an organization's members.
+      tags:
+      - organizations
+    post:
+      operationId: add-member
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMemberInputBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddMemberOutputBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Add or invite a member by email (admin+; owner required to grant owner).
+        Unknown emails get an invite link.
+      tags:
+      - organizations
+  /organizations/{id}/members/{userId}:
+    delete:
+      operationId: remove-member
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      - explode: false
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Remove a member (admin+; owner required to remove owners; never the
+        last owner).
+      tags:
+      - organizations
+    patch:
+      operationId: update-member
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      - explode: false
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberJSONView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Change a member's role (admin+; owner required to touch owners).
+      tags:
+      - organizations
+  /placements:
+    get:
+      operationId: list-placements
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FleetPlacementListOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: "List all placements in the tenant with pool, slot, and hypervisor\
+        \ context (fleet overview)."
+      tags:
+      - placement
+  /placements/{id}:
+    patch:
+      operationId: backfill-placement-vmid
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BackfillVMIDInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlacementView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Attach the externally-assigned Proxmox vmid to a placement.
+      tags:
+      - placement
+  /pools:
+    get:
+      operationId: list-pools
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PoolListOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: List node pools in the caller's tenant.
+      tags:
+      - placement
+    post:
+      operationId: create-pool
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePoolInputBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PoolResultBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: "Create a node pool and place its VMs across hypervisors (anti-affinity\
+        \ spread, all-or-nothing)."
+      tags:
+      - placement
+  /pools/{id}:
+    delete:
+      operationId: delete-pool
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Delete a pool and release all its placements.
+      tags:
+      - placement
+    get:
+      operationId: get-pool
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PoolResultBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Fetch a pool and its current placements.
+      tags:
+      - placement
+    patch:
+      operationId: resize-pool
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResizePoolInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PoolResultBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Resize a pool's desired count. Grow places new VMs (all-or-nothing);
+        shrink removes newest placements (LIFO).
+      tags:
+      - placement
+  /pools/{id}/placements:
+    get:
+      operationId: list-pool-placements
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlacementListOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: List a pool's placements (hypervisor + optional vmid).
+      tags:
+      - placement
+  /slots:
+    get:
+      operationId: list-slots
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlotListOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: List slots in the caller's tenant.
+      tags:
+      - fleet
+    post:
+      operationId: create-slot
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlotBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlotView"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Create a slot (t-shirt-size VM template) in the caller's tenant.
+      tags:
+      - fleet
+  /slots/{id}:
+    delete:
+      operationId: delete-slot
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Delete a slot.
+      tags:
+      - fleet
+    get:
+      operationId: get-slot
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlotView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Fetch a slot by ID.
+      tags:
+      - fleet
+    put:
+      operationId: update-slot
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlotBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlotView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Update a slot.
+      tags:
+      - fleet
+components:
+  schemas:
+    AcceptInviteInputBody:
+      additionalProperties: false
+      example:
+        password: password
+        $schema: https://openapi-generator.tech
+        display_name: display_name
+        token: token
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        display_name:
+          maxLength: 255
+          type: string
+        password:
+          maxLength: 128
+          minLength: 8
+          type: string
+        token:
+          type: string
+      required:
+      - token
+    AccountEmailView:
+      additionalProperties: false
+      example:
+        is_primary: true
+        verified_at: 2000-01-23T04:56:07.000+00:00
+        id: id
+        email: email
+      properties:
+        email:
+          type: string
+        id:
+          type: string
+        is_primary:
+          type: boolean
+        verified_at:
+          format: date-time
+          type: string
+      required:
+      - email
+      - id
+      - is_primary
+    AddMemberInputBody:
+      additionalProperties: false
+      example:
+        role: owner
+        $schema: https://openapi-generator.tech
+        email: email
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        email:
+          format: email
+          maxLength: 255
+          type: string
+        role:
+          enum:
+          - owner
+          - admin
+          - member
+          type: string
+      required:
+      - email
+    AddMemberOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        invited: true
+        member:
+          last_login_at: 2000-01-23T04:56:07.000+00:00
+          account_id: account_id
+          is_active: true
+          role: role
+          $schema: https://openapi-generator.tech
+          user_id: user_id
+          pending: true
+          created_at: 2000-01-23T04:56:07.000+00:00
+          display_name: display_name
+          email: email
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        invited:
+          description: An invite email was sent (pending account).
+          type: boolean
+        member:
+          $ref: "#/components/schemas/MemberJSONView"
+      required:
+      - invited
+      - member
+    ApiKeyView:
+      additionalProperties: false
+      example:
+        last_used_at: 2000-01-23T04:56:07.000+00:00
+        expires_at: 2000-01-23T04:56:07.000+00:00
+        revoked_at: 2000-01-23T04:56:07.000+00:00
+        prefix: prefix
+        name: name
+        created_at: 2000-01-23T04:56:07.000+00:00
+        id: id
+      properties:
+        created_at:
+          format: date-time
+          type: string
+        expires_at:
+          format: date-time
+          type: string
+        id:
+          type: string
+        last_used_at:
+          format: date-time
+          type: string
+        name:
+          type: string
+        prefix:
+          description: "Leading characters of the key, for identification."
+          type: string
+        revoked_at:
+          format: date-time
+          type: string
+      required:
+      - created_at
+      - id
+      - name
+      - prefix
+    AuthTokens:
+      additionalProperties: false
+      example:
+        access_token: access_token
+        refresh_expires_at: 2000-01-23T04:56:07.000+00:00
+        refresh_token: refresh_token
+        access_expires_at: 2000-01-23T04:56:07.000+00:00
+      properties:
+        access_expires_at:
+          format: date-time
+          type: string
+        access_token:
+          type: string
+        refresh_expires_at:
+          format: date-time
+          type: string
+        refresh_token:
+          type: string
+      required:
+      - access_expires_at
+      - access_token
+      - refresh_expires_at
+      - refresh_token
+    BackfillVMIDInputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        vmid: 1
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        vmid:
+          format: int64
+          minimum: 1
+          type: integer
+      required:
+      - vmid
+    CreateAPIKeyInputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        expires_in_days: 292
+        name: name
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        expires_in_days:
+          description: Days until the key expires; omit or 0 for no expiry.
+          format: int64
+          maximum: 3650
+          minimum: 0
+          type: integer
+        name:
+          description: Human label for the key.
+          maxLength: 255
+          type: string
+      required:
+      - name
+    CreateAPIKeyOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        key:
+          last_used_at: 2000-01-23T04:56:07.000+00:00
+          expires_at: 2000-01-23T04:56:07.000+00:00
+          revoked_at: 2000-01-23T04:56:07.000+00:00
+          prefix: prefix
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+        token: token
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        key:
+          $ref: "#/components/schemas/ApiKeyView"
+        token:
+          description: "Plaintext API key — shown once, store it securely."
+          type: string
+      required:
+      - key
+      - token
+    CreateOrgInputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        name: name
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        name:
+          maxLength: 255
+          type: string
+      required:
+      - name
+    CreatePoolInputBody:
+      additionalProperties: false
+      example:
+        metadata: ""
+        $schema: https://openapi-generator.tech
+        slot_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        name: name
+        desired_count: 0
+        datacenter_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        datacenter_id:
+          format: uuid
+          type: string
+        desired_count:
+          format: int64
+          minimum: 0
+          type: integer
+        metadata: {}
+        name:
+          maxLength: 255
+          type: string
+        slot_id:
+          format: uuid
+          type: string
+      required:
+      - datacenter_id
+      - desired_count
+      - name
+      - slot_id
+    DatacenterBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        name: name
+        insecure_skip_verify: true
+        url: url
+        token: token
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        insecure_skip_verify:
+          type: boolean
+        name:
+          maxLength: 255
+          type: string
+        token:
+          maxLength: 512
+          type: string
+        url:
+          maxLength: 255
+          type: string
+      required:
+      - name
+      - url
+    DatacenterListOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        items:
+        - $schema: https://openapi-generator.tech
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          has_token: true
+          id: id
+          insecure_skip_verify: true
+          url: url
+        - $schema: https://openapi-generator.tech
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          has_token: true
+          id: id
+          insecure_skip_verify: true
+          url: url
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/DatacenterView"
+          nullable: true
+          type: array
+      required:
+      - items
+    DatacenterView:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        name: name
+        created_at: 2000-01-23T04:56:07.000+00:00
+        has_token: true
+        id: id
+        insecure_skip_verify: true
+        url: url
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        has_token:
+          description: Whether a Proxmox API token is configured (the token itself
+            is never returned).
+          type: boolean
+        id:
+          type: string
+        insecure_skip_verify:
+          description: Whether TLS verification is disabled for this cluster (self-signed
+            certs).
+          type: boolean
+        name:
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+        url:
+          type: string
+      required:
+      - created_at
+      - has_token
+      - id
+      - insecure_skip_verify
+      - name
+      - updated_at
+      - url
+    DiscoverInputBody:
+      additionalProperties: false
+      example:
+        async: true
+        $schema: https://openapi-generator.tech
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        async:
+          type: boolean
+    DiscoverOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        queued: true
+        items:
+        - last_synced_at: 2000-01-23T04:56:07.000+00:00
+          cpu_bookable: 0
+          $schema: https://openapi-generator.tech
+          disk_gb_reserved: 2
+          created_at: 2000-01-23T04:56:07.000+00:00
+          cpu_reserved: 6
+          cpu_total: 1
+          disk_gb_total: 7
+          ram_gb_used: 7
+          cpu_used: 5
+          ram_gb_reserved: 2
+          schedulable: true
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          disk_gb_bookable: 5
+          disk_gb_used: 9
+          name: name
+          id: id
+          ram_gb_bookable: 3
+          ram_gb_total: 4
+          datacenter_id: datacenter_id
+        - last_synced_at: 2000-01-23T04:56:07.000+00:00
+          cpu_bookable: 0
+          $schema: https://openapi-generator.tech
+          disk_gb_reserved: 2
+          created_at: 2000-01-23T04:56:07.000+00:00
+          cpu_reserved: 6
+          cpu_total: 1
+          disk_gb_total: 7
+          ram_gb_used: 7
+          cpu_used: 5
+          ram_gb_reserved: 2
+          schedulable: true
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          disk_gb_bookable: 5
+          disk_gb_used: 9
+          name: name
+          id: id
+          ram_gb_bookable: 3
+          ram_gb_total: 4
+          datacenter_id: datacenter_id
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/HypervisorView"
+          nullable: true
+          type: array
+        queued:
+          type: boolean
+      required:
+      - items
+      - queued
+    ErrorDetail:
+      additionalProperties: false
+      properties:
+        location:
+          description: "Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'"
+          type: string
+        message:
+          description: Error message text
+          type: string
+        value: {}
+    ErrorModel:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        detail:
+          description: A human-readable explanation specific to this occurrence of
+            the problem.
+          type: string
+        errors:
+          description: Optional list of individual error details
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+          nullable: true
+          type: array
+        instance:
+          description: A URI reference that identifies the specific occurrence of
+            the problem.
+          format: uri
+          type: string
+        status:
+          description: HTTP status code
+          format: int64
+          type: integer
+        title:
+          description: "A short, human-readable summary of the problem type. This\
+            \ value should not change between occurrences of the error."
+          type: string
+        type:
+          default: about:blank
+          description: A URI reference to human-readable documentation for the error.
+          format: uri
+          type: string
+    FleetPlacementListOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        items:
+        - vcpu: 1
+          vmid: 5
+          hypervisor_name: hypervisor_name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          hypervisor_id: hypervisor_id
+          id: id
+          pool_id: pool_id
+          slot_name: slot_name
+          pool_name: pool_name
+          ram_gb: 6
+          disk_gb: 0
+        - vcpu: 1
+          vmid: 5
+          hypervisor_name: hypervisor_name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          hypervisor_id: hypervisor_id
+          id: id
+          pool_id: pool_id
+          slot_name: slot_name
+          pool_name: pool_name
+          ram_gb: 6
+          disk_gb: 0
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/FleetPlacementView"
+          nullable: true
+          type: array
+      required:
+      - items
+    FleetPlacementView:
+      additionalProperties: false
+      example:
+        vcpu: 1
+        vmid: 5
+        hypervisor_name: hypervisor_name
+        created_at: 2000-01-23T04:56:07.000+00:00
+        hypervisor_id: hypervisor_id
+        id: id
+        pool_id: pool_id
+        slot_name: slot_name
+        pool_name: pool_name
+        ram_gb: 6
+        disk_gb: 0
+      properties:
+        created_at:
+          format: date-time
+          type: string
+        disk_gb:
+          format: int64
+          type: integer
+        hypervisor_id:
+          type: string
+        hypervisor_name:
+          type: string
+        id:
+          type: string
+        pool_id:
+          type: string
+        pool_name:
+          type: string
+        ram_gb:
+          format: int64
+          type: integer
+        slot_name:
+          type: string
+        vcpu:
+          format: int64
+          type: integer
+        vmid:
+          format: int64
+          type: integer
+      required:
+      - created_at
+      - disk_gb
+      - hypervisor_id
+      - hypervisor_name
+      - id
+      - pool_id
+      - pool_name
+      - ram_gb
+      - slot_name
+      - vcpu
+    HealthOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        status: status
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        status:
+          type: string
+      required:
+      - status
+    HypervisorBody:
+      additionalProperties: false
+      example:
+        ram_gb_reserved: 0
+        $schema: https://openapi-generator.tech
+        disk_gb_reserved: 0
+        schedulable: true
+        name: name
+        cpu_reserved: 0
+        cpu_total: 0
+        disk_gb_total: 0
+        ram_gb_total: 0
+        datacenter_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        cpu_reserved:
+          format: int64
+          minimum: 0
+          type: integer
+        cpu_total:
+          format: int64
+          minimum: 0
+          type: integer
+        datacenter_id:
+          format: uuid
+          type: string
+        disk_gb_reserved:
+          format: int64
+          minimum: 0
+          type: integer
+        disk_gb_total:
+          format: int64
+          minimum: 0
+          type: integer
+        name:
+          maxLength: 255
+          type: string
+        ram_gb_reserved:
+          format: int64
+          minimum: 0
+          type: integer
+        ram_gb_total:
+          format: int64
+          minimum: 0
+          type: integer
+        schedulable:
+          type: boolean
+      required:
+      - cpu_reserved
+      - cpu_total
+      - datacenter_id
+      - disk_gb_reserved
+      - disk_gb_total
+      - name
+      - ram_gb_reserved
+      - ram_gb_total
+    HypervisorListOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        items:
+        - last_synced_at: 2000-01-23T04:56:07.000+00:00
+          cpu_bookable: 0
+          $schema: https://openapi-generator.tech
+          disk_gb_reserved: 2
+          created_at: 2000-01-23T04:56:07.000+00:00
+          cpu_reserved: 6
+          cpu_total: 1
+          disk_gb_total: 7
+          ram_gb_used: 7
+          cpu_used: 5
+          ram_gb_reserved: 2
+          schedulable: true
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          disk_gb_bookable: 5
+          disk_gb_used: 9
+          name: name
+          id: id
+          ram_gb_bookable: 3
+          ram_gb_total: 4
+          datacenter_id: datacenter_id
+        - last_synced_at: 2000-01-23T04:56:07.000+00:00
+          cpu_bookable: 0
+          $schema: https://openapi-generator.tech
+          disk_gb_reserved: 2
+          created_at: 2000-01-23T04:56:07.000+00:00
+          cpu_reserved: 6
+          cpu_total: 1
+          disk_gb_total: 7
+          ram_gb_used: 7
+          cpu_used: 5
+          ram_gb_reserved: 2
+          schedulable: true
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          disk_gb_bookable: 5
+          disk_gb_used: 9
+          name: name
+          id: id
+          ram_gb_bookable: 3
+          ram_gb_total: 4
+          datacenter_id: datacenter_id
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/HypervisorView"
+          nullable: true
+          type: array
+      required:
+      - items
+    HypervisorView:
+      additionalProperties: false
+      example:
+        last_synced_at: 2000-01-23T04:56:07.000+00:00
+        cpu_bookable: 0
+        $schema: https://openapi-generator.tech
+        disk_gb_reserved: 2
+        created_at: 2000-01-23T04:56:07.000+00:00
+        cpu_reserved: 6
+        cpu_total: 1
+        disk_gb_total: 7
+        ram_gb_used: 7
+        cpu_used: 5
+        ram_gb_reserved: 2
+        schedulable: true
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        disk_gb_bookable: 5
+        disk_gb_used: 9
+        name: name
+        id: id
+        ram_gb_bookable: 3
+        ram_gb_total: 4
+        datacenter_id: datacenter_id
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        cpu_bookable:
+          format: int64
+          type: integer
+        cpu_reserved:
+          format: int64
+          type: integer
+        cpu_total:
+          format: int64
+          type: integer
+        cpu_used:
+          description: vCPU allocated to existing guests (from discovery).
+          format: int64
+          type: integer
+        created_at:
+          format: date-time
+          type: string
+        datacenter_id:
+          type: string
+        disk_gb_bookable:
+          format: int64
+          type: integer
+        disk_gb_reserved:
+          format: int64
+          type: integer
+        disk_gb_total:
+          format: int64
+          type: integer
+        disk_gb_used:
+          description: Disk (GB) allocated to existing guests (from discovery).
+          format: int64
+          type: integer
+        id:
+          type: string
+        last_synced_at:
+          format: date-time
+          type: string
+        name:
+          type: string
+        ram_gb_bookable:
+          format: int64
+          type: integer
+        ram_gb_reserved:
+          format: int64
+          type: integer
+        ram_gb_total:
+          format: int64
+          type: integer
+        ram_gb_used:
+          description: RAM (GB) allocated to existing guests (from discovery).
+          format: int64
+          type: integer
+        schedulable:
+          description: "When false, placement excludes this hypervisor."
+          type: boolean
+        updated_at:
+          format: date-time
+          type: string
+      required:
+      - cpu_bookable
+      - cpu_reserved
+      - cpu_total
+      - cpu_used
+      - created_at
+      - datacenter_id
+      - disk_gb_bookable
+      - disk_gb_reserved
+      - disk_gb_total
+      - disk_gb_used
+      - id
+      - name
+      - ram_gb_bookable
+      - ram_gb_reserved
+      - ram_gb_total
+      - ram_gb_used
+      - schedulable
+      - updated_at
+    ListAPIKeysOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        items:
+        - last_used_at: 2000-01-23T04:56:07.000+00:00
+          expires_at: 2000-01-23T04:56:07.000+00:00
+          revoked_at: 2000-01-23T04:56:07.000+00:00
+          prefix: prefix
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+        - last_used_at: 2000-01-23T04:56:07.000+00:00
+          expires_at: 2000-01-23T04:56:07.000+00:00
+          revoked_at: 2000-01-23T04:56:07.000+00:00
+          prefix: prefix
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/ApiKeyView"
+          nullable: true
+          type: array
+      required:
+      - items
+    LoginInputBody:
+      additionalProperties: false
+      example:
+        password: password
+        $schema: https://openapi-generator.tech
+        organization_id: organization_id
+        email: email
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        email:
+          format: email
+          maxLength: 255
+          type: string
+        organization_id:
+          type: string
+        password:
+          maxLength: 128
+          type: string
+      required:
+      - email
+      - password
+    LoginOutputBody:
+      additionalProperties: false
+      example:
+        account_id: account_id
+        $schema: https://openapi-generator.tech
+        organization:
+          id: id
+          slug: slug
+          status: status
+        tokens:
+          access_token: access_token
+          refresh_expires_at: 2000-01-23T04:56:07.000+00:00
+          refresh_token: refresh_token
+          access_expires_at: 2000-01-23T04:56:07.000+00:00
+        memberships:
+        - organization_id: organization_id
+          organization_slug: organization_slug
+          organization_name: organization_name
+        - organization_id: organization_id
+          organization_slug: organization_slug
+          organization_name: organization_name
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        account_id:
+          type: string
+        memberships:
+          items:
+            $ref: "#/components/schemas/MembershipView"
+          nullable: true
+          type: array
+        organization:
+          $ref: "#/components/schemas/OrgView"
+        tokens:
+          $ref: "#/components/schemas/AuthTokens"
+    LogoutInputBody:
+      additionalProperties: false
+      example:
+        refresh_token: refresh_token
+        $schema: https://openapi-generator.tech
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        refresh_token:
+          type: string
+      required:
+      - refresh_token
+    MeOutputBody:
+      additionalProperties: false
+      example:
+        emails:
+        - is_primary: true
+          verified_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+          email: email
+        - is_primary: true
+          verified_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+          email: email
+        current_organization:
+          id: id
+          slug: slug
+          status: status
+        last_login_at: 2000-01-23T04:56:07.000+00:00
+        account_id: account_id
+        $schema: https://openapi-generator.tech
+        display_name: display_name
+        memberships:
+        - organization_id: organization_id
+          organization_slug: organization_slug
+          organization_name: organization_name
+        - organization_id: organization_id
+          organization_slug: organization_slug
+          organization_name: organization_name
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        account_id:
+          type: string
+        current_organization:
+          $ref: "#/components/schemas/OrgView"
+        display_name:
+          type: string
+        emails:
+          items:
+            $ref: "#/components/schemas/AccountEmailView"
+          nullable: true
+          type: array
+        last_login_at:
+          format: date-time
+          type: string
+        memberships:
+          items:
+            $ref: "#/components/schemas/MembershipView"
+          nullable: true
+          type: array
+      required:
+      - account_id
+      - display_name
+      - emails
+      - memberships
+    MemberJSONView:
+      additionalProperties: false
+      example:
+        last_login_at: 2000-01-23T04:56:07.000+00:00
+        account_id: account_id
+        is_active: true
+        role: role
+        $schema: https://openapi-generator.tech
+        user_id: user_id
+        pending: true
+        created_at: 2000-01-23T04:56:07.000+00:00
+        display_name: display_name
+        email: email
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        account_id:
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        display_name:
+          type: string
+        email:
+          type: string
+        is_active:
+          type: boolean
+        last_login_at:
+          format: date-time
+          type: string
+        pending:
+          description: Invited but hasn't accepted (no password set yet).
+          type: boolean
+        role:
+          type: string
+        user_id:
+          type: string
+      required:
+      - account_id
+      - created_at
+      - display_name
+      - email
+      - is_active
+      - pending
+      - role
+      - user_id
+    MemberListOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        items:
+        - last_login_at: 2000-01-23T04:56:07.000+00:00
+          account_id: account_id
+          is_active: true
+          role: role
+          $schema: https://openapi-generator.tech
+          user_id: user_id
+          pending: true
+          created_at: 2000-01-23T04:56:07.000+00:00
+          display_name: display_name
+          email: email
+        - last_login_at: 2000-01-23T04:56:07.000+00:00
+          account_id: account_id
+          is_active: true
+          role: role
+          $schema: https://openapi-generator.tech
+          user_id: user_id
+          pending: true
+          created_at: 2000-01-23T04:56:07.000+00:00
+          display_name: display_name
+          email: email
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/MemberJSONView"
+          nullable: true
+          type: array
+      required:
+      - items
+    MembershipView:
+      additionalProperties: false
+      example:
+        organization_id: organization_id
+        organization_slug: organization_slug
+        organization_name: organization_name
+      properties:
+        organization_id:
+          type: string
+        organization_name:
+          type: string
+        organization_slug:
+          type: string
+      required:
+      - organization_id
+      - organization_name
+      - organization_slug
+    OrgFullView:
+      additionalProperties: false
+      example:
+        role: role
+        $schema: https://openapi-generator.tech
+        domain: domain
+        name: name
+        created_at: 2000-01-23T04:56:07.000+00:00
+        id: id
+        slug: slug
+        status: status
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        domain:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          description: The calling account's role in this organization.
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+      required:
+      - created_at
+      - id
+      - name
+      - role
+      - slug
+      - status
+    OrgListOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        items:
+        - role: role
+          $schema: https://openapi-generator.tech
+          domain: domain
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+          slug: slug
+          status: status
+        - role: role
+          $schema: https://openapi-generator.tech
+          domain: domain
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+          slug: slug
+          status: status
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/OrgFullView"
+          nullable: true
+          type: array
+      required:
+      - items
+    OrgView:
+      additionalProperties: false
+      example:
+        id: id
+        slug: slug
+        status: status
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+      required:
+      - id
+      - slug
+      - status
+    PlacementListOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        items:
+        - $schema: https://openapi-generator.tech
+          vmid: 0
+          hypervisor_name: hypervisor_name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          hypervisor_id: hypervisor_id
+          id: id
+        - $schema: https://openapi-generator.tech
+          vmid: 0
+          hypervisor_name: hypervisor_name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          hypervisor_id: hypervisor_id
+          id: id
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/PlacementView"
+          nullable: true
+          type: array
+      required:
+      - items
+    PlacementView:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        vmid: 0
+        hypervisor_name: hypervisor_name
+        created_at: 2000-01-23T04:56:07.000+00:00
+        hypervisor_id: hypervisor_id
+        id: id
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        hypervisor_id:
+          type: string
+        hypervisor_name:
+          type: string
+        id:
+          type: string
+        vmid:
+          format: int64
+          type: integer
+      required:
+      - created_at
+      - hypervisor_id
+      - hypervisor_name
+      - id
+    PoolListOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        items:
+        - metadata: ""
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          slot_id: slot_id
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          desired_count: 0
+          id: id
+          datacenter_id: datacenter_id
+        - metadata: ""
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          slot_id: slot_id
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          desired_count: 0
+          id: id
+          datacenter_id: datacenter_id
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/PoolView"
+          nullable: true
+          type: array
+      required:
+      - items
+    PoolResultBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        pool:
+          metadata: ""
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          slot_id: slot_id
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          desired_count: 0
+          id: id
+          datacenter_id: datacenter_id
+        placements:
+        - $schema: https://openapi-generator.tech
+          vmid: 0
+          hypervisor_name: hypervisor_name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          hypervisor_id: hypervisor_id
+          id: id
+        - $schema: https://openapi-generator.tech
+          vmid: 0
+          hypervisor_name: hypervisor_name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          hypervisor_id: hypervisor_id
+          id: id
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        placements:
+          items:
+            $ref: "#/components/schemas/PlacementView"
+          nullable: true
+          type: array
+        pool:
+          $ref: "#/components/schemas/PoolView"
+      required:
+      - placements
+      - pool
+    PoolView:
+      additionalProperties: false
+      example:
+        metadata: ""
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        slot_id: slot_id
+        name: name
+        created_at: 2000-01-23T04:56:07.000+00:00
+        desired_count: 0
+        id: id
+        datacenter_id: datacenter_id
+      properties:
+        created_at:
+          format: date-time
+          type: string
+        datacenter_id:
+          type: string
+        desired_count:
+          format: int64
+          type: integer
+        id:
+          type: string
+        metadata: {}
+        name:
+          type: string
+        slot_id:
+          type: string
+        updated_at:
+          format: date-time
+          type: string
+      required:
+      - created_at
+      - datacenter_id
+      - desired_count
+      - id
+      - name
+      - slot_id
+      - updated_at
+    RefreshInputBody:
+      additionalProperties: false
+      example:
+        refresh_token: refresh_token
+        $schema: https://openapi-generator.tech
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        refresh_token:
+          type: string
+      required:
+      - refresh_token
+    RefreshOutputBody:
+      additionalProperties: false
+      example:
+        access_token: access_token
+        refresh_expires_at: 2000-01-23T04:56:07.000+00:00
+        refresh_token: refresh_token
+        $schema: https://openapi-generator.tech
+        access_expires_at: 2000-01-23T04:56:07.000+00:00
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        access_expires_at:
+          format: date-time
+          type: string
+        access_token:
+          type: string
+        refresh_expires_at:
+          format: date-time
+          type: string
+        refresh_token:
+          type: string
+      required:
+      - access_expires_at
+      - access_token
+      - refresh_expires_at
+      - refresh_token
+    ResizePoolInputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        desired_count: 0
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        desired_count:
+          format: int64
+          minimum: 0
+          type: integer
+      required:
+      - desired_count
+    SignupInputBody:
+      additionalProperties: false
+      example:
+        password: password
+        $schema: https://openapi-generator.tech
+        organization_name: organization_name
+        display_name: display_name
+        email: email
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        display_name:
+          maxLength: 255
+          type: string
+        email:
+          format: email
+          maxLength: 255
+          type: string
+        organization_name:
+          maxLength: 255
+          type: string
+        password:
+          maxLength: 128
+          minLength: 8
+          type: string
+      required:
+      - email
+      - organization_name
+      - password
+    SignupOutputBody:
+      additionalProperties: false
+      example:
+        access_token: access_token
+        refresh_expires_at: 2000-01-23T04:56:07.000+00:00
+        refresh_token: refresh_token
+        account_id: account_id
+        $schema: https://openapi-generator.tech
+        organization:
+          id: id
+          slug: slug
+          status: status
+        access_expires_at: 2000-01-23T04:56:07.000+00:00
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        access_expires_at:
+          format: date-time
+          type: string
+        access_token:
+          type: string
+        account_id:
+          type: string
+        organization:
+          $ref: "#/components/schemas/OrgView"
+        refresh_expires_at:
+          format: date-time
+          type: string
+        refresh_token:
+          type: string
+      required:
+      - access_expires_at
+      - access_token
+      - account_id
+      - organization
+      - refresh_expires_at
+      - refresh_token
+    SlotBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        vcpu: 1
+        name: name
+        ram_gb: 1
+        disk_gb: 1
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        disk_gb:
+          format: int64
+          minimum: 1
+          type: integer
+        name:
+          maxLength: 255
+          type: string
+        ram_gb:
+          format: int64
+          minimum: 1
+          type: integer
+        vcpu:
+          format: int64
+          minimum: 1
+          type: integer
+      required:
+      - disk_gb
+      - name
+      - ram_gb
+      - vcpu
+    SlotListOutputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        items:
+        - $schema: https://openapi-generator.tech
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          vcpu: 1
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+          ram_gb: 6
+          disk_gb: 0
+        - $schema: https://openapi-generator.tech
+          updated_at: 2000-01-23T04:56:07.000+00:00
+          vcpu: 1
+          name: name
+          created_at: 2000-01-23T04:56:07.000+00:00
+          id: id
+          ram_gb: 6
+          disk_gb: 0
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/SlotView"
+          nullable: true
+          type: array
+      required:
+      - items
+    SlotView:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        updated_at: 2000-01-23T04:56:07.000+00:00
+        vcpu: 1
+        name: name
+        created_at: 2000-01-23T04:56:07.000+00:00
+        id: id
+        ram_gb: 6
+        disk_gb: 0
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        created_at:
+          format: date-time
+          type: string
+        disk_gb:
+          format: int64
+          type: integer
+        id:
+          type: string
+        name:
+          type: string
+        ram_gb:
+          format: int64
+          type: integer
+        updated_at:
+          format: date-time
+          type: string
+        vcpu:
+          format: int64
+          type: integer
+      required:
+      - created_at
+      - disk_gb
+      - id
+      - name
+      - ram_gb
+      - updated_at
+      - vcpu
+    SwitchOrgInputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        organization_id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        organization_id:
+          format: uuid
+          type: string
+      required:
+      - organization_id
+    UpdateMemberInputBody:
+      additionalProperties: false
+      example:
+        role: owner
+        $schema: https://openapi-generator.tech
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        role:
+          enum:
+          - owner
+          - admin
+          - member
+          type: string
+      required:
+      - role
+    UpdateOrgInputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        name: name
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        name:
+          maxLength: 255
+          type: string
+      required:
+      - name
+    VerifyEmailInputBody:
+      additionalProperties: false
+      example:
+        $schema: https://openapi-generator.tech
+        token: token
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        token:
+          type: string
+      required:
+      - token
+  securitySchemes:
+    bearer:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http

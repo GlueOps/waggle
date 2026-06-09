@@ -1,0 +1,26 @@
+# Copy to terraform.tfvars and fill in. Keep secrets out of version control.
+
+# --- Waggle ---
+waggle_endpoint = "https://waggle.example.com/api/v1"
+waggle_token    = "ey..." # or set waggle_api_key instead
+datacenter_id   = "00000000-0000-0000-0000-000000000000"
+slot_id         = "00000000-0000-0000-0000-000000000000"
+pool_name       = "workers"
+desired_count   = 3
+
+# --- Proxmox (bpg/proxmox) ---
+proxmox_endpoint  = "https://pve.example.com:8006/"
+proxmox_api_token = "terraform@pve!tf=00000000-0000-0000-0000-000000000000"
+proxmox_insecure  = true
+
+# --- VM shape ---
+template_vm_id   = 9000
+node_name_prefix = "k8s-node"
+cores            = 4
+memory_mb        = 8192
+disk_gb          = 40
+datastore_id     = "local-lvm"
+network_bridge   = "vmbr0"
+ssh_public_keys  = [
+  # "ssh-ed25519 AAAA... you@host",
+]

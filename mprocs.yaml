@@ -1,0 +1,12 @@
+procs:
+  api:
+    # FRONTEND_MODE=proxy makes the Go server reverse-proxy to the Vite dev
+    # server below, so the app + API are same-origin at http://localhost:8080.
+    cmd: ["go", "run", ".", "serve"]
+    env:
+      FRONTEND_MODE: "proxy"
+  worker:
+    cmd: [ "go", "run", ".", "worker" ]
+  ui:
+    cmd: ["yarn", "dev"]
+    cwd: "ui"
