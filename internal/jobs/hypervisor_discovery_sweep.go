@@ -92,10 +92,13 @@ type HypervisorDiscoverySweepArgs struct{}
 func (HypervisorDiscoverySweepArgs) Kind() string { return "hypervisor_discovery_sweep" }
 
 func (HypervisorDiscoverySweepArgs) InsertOpts() river.InsertOpts {
-	// Coalesce overlapping sweeps: if a sweep is still pending/running when the
-	// next interval fires, don't stack another on top of it.
+	// Coalesce overlapping sweeps: if a sweep is still in flight when the next
+	// interval fires, don't stack another on top of it. ByState is restricted
+	// to in-flight states (see activeUniqueStates) — the default would include
+	// completed, which would let a single finished sweep block every future
+	// periodic tick until the job cleaner ran.
 	return river.InsertOpts{
-		UniqueOpts: river.UniqueOpts{ByArgs: true},
+		UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: activeUniqueStates},
 	}
 }
 

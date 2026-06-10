@@ -9,7 +9,23 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 )
+
+// activeUniqueStates restricts ByArgs uniqueness to jobs that are still in
+// flight. River's default ByState also includes JobStateCompleted, which means
+// a once-completed unique job keeps blocking duplicate inserts until the job
+// cleaner removes it (~24h) — that silently stops a periodic/recurring job from
+// ever running again. Limiting uniqueness to the in-flight states (the four
+// required by River, plus retryable) coalesces overlapping enqueues without
+// blocking the next scheduled run.
+var activeUniqueStates = []rivertype.JobState{
+	rivertype.JobStateAvailable,
+	rivertype.JobStatePending,
+	rivertype.JobStateRunning,
+	rivertype.JobStateScheduled,
+	rivertype.JobStateRetryable,
+}
 
 // HypervisorDiscoverer is the subset of FleetService the discovery worker needs.
 // Declared here (rather than importing service) because service imports jobs;
@@ -58,9 +74,10 @@ func (HypervisorDiscoveryArgs) Kind() string { return "hypervisor_discovery" }
 
 func (HypervisorDiscoveryArgs) InsertOpts() river.InsertOpts {
 	// Coalesce duplicate discovery requests for the same datacenter that are
-	// still pending/running.
+	// still in flight, but allow a fresh discovery once the previous one has
+	// completed (see activeUniqueStates).
 	return river.InsertOpts{
-		UniqueOpts: river.UniqueOpts{ByArgs: true},
+		UniqueOpts: river.UniqueOpts{ByArgs: true, ByState: activeUniqueStates},
 	}
 }
 
