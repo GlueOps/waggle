@@ -72,20 +72,42 @@ func runWorker() error {
 		return fmt.Errorf("init destroyer: %w", err)
 	}
 
-	discovery := jobs.NewHypervisorDiscoveryService(service.NewFleetService(tenants, service.ReservationDefaults{
+	fleet := service.NewFleetService(tenants, service.ReservationDefaults{
 		CPU: cfg.ReserveCPU, RAMGB: cfg.ReserveRAMGB, DiskGB: cfg.ReserveDiskGB,
-	}))
+	})
+	discovery := jobs.NewHypervisorDiscoveryService(fleet)
+	discoverySweep := jobs.NewHypervisorDiscoverySweepService(controlDB, fleet)
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, jobs.NewTenantProvisionerWorker(provisioner))
 	river.AddWorker(workers, jobs.NewTenantDestroyerWorker(destroyer))
 	river.AddWorker(workers, jobs.NewHypervisorDiscoveryWorker(discovery))
+	river.AddWorker(workers, jobs.NewHypervisorDiscoverySweepWorker(discoverySweep))
+
+	discoveryInterval, err := cfg.DiscoveryIntervalDuration()
+	if err != nil {
+		return err
+	}
+	var periodicJobs []*river.PeriodicJob
+	if discoveryInterval > 0 {
+		periodicJobs = append(periodicJobs, river.NewPeriodicJob(
+			river.PeriodicInterval(discoveryInterval),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.HypervisorDiscoverySweepArgs{}, nil
+			},
+			&river.PeriodicJobOpts{RunOnStart: true},
+		))
+		log.Printf("periodic hypervisor discovery enabled (interval=%s)", discoveryInterval)
+	} else {
+		log.Printf("periodic hypervisor discovery disabled (set DISCOVERY_INTERVAL to enable)")
+	}
 
 	client, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: 10},
 		},
-		Workers: workers,
+		Workers:      workers,
+		PeriodicJobs: periodicJobs,
 	})
 	if err != nil {
 		return fmt.Errorf("new river client: %w", err)

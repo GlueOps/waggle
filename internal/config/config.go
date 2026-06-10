@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
@@ -46,6 +47,12 @@ type Config struct {
 	ReserveCPU    int `mapstructure:"reserve_cpu" yaml:"reserve_cpu"`
 	ReserveRAMGB  int `mapstructure:"reserve_ram_gb" yaml:"reserve_ram_gb"`
 	ReserveDiskGB int `mapstructure:"reserve_disk_gb" yaml:"reserve_disk_gb"`
+
+	// DiscoveryInterval is how often the worker sweeps all active tenants and
+	// re-runs hypervisor discovery per datacenter (Go duration string, e.g.
+	// "15m", "1h"). Empty or "0" disables periodic discovery; discovery then
+	// only runs when triggered explicitly via the API.
+	DiscoveryInterval string `mapstructure:"discovery_interval" yaml:"discovery_interval"`
 }
 
 const (
@@ -85,6 +92,7 @@ var envKeys = []string{
 	"reserve_cpu",
 	"reserve_ram_gb",
 	"reserve_disk_gb",
+	"discovery_interval",
 }
 
 func Load() (*Config, error) {
@@ -108,6 +116,10 @@ func Load() (*Config, error) {
 	v.SetDefault("reserve_cpu", 0)
 	v.SetDefault("reserve_ram_gb", 2)
 	v.SetDefault("reserve_disk_gb", 10)
+	// Re-discover every active tenant's hypervisors on this cadence so dashboard
+	// capacity stays fresh without manual triggers. Set DISCOVERY_INTERVAL=0 to
+	// disable.
+	v.SetDefault("discovery_interval", "15m")
 
 	cfg := &Config{}
 	if err := v.Unmarshal(cfg); err != nil {
@@ -137,5 +149,25 @@ func (c *Config) Validate() error {
 	default:
 		return fmt.Errorf("invalid FRONTEND_MODE %q (expected proxy|embed|none)", c.FrontendMode)
 	}
+	if _, err := c.DiscoveryIntervalDuration(); err != nil {
+		return err
+	}
 	return nil
+}
+
+// DiscoveryIntervalDuration parses DiscoveryInterval into a duration. Empty or
+// "0" returns 0, meaning periodic discovery is disabled.
+func (c *Config) DiscoveryIntervalDuration() (time.Duration, error) {
+	s := strings.TrimSpace(c.DiscoveryInterval)
+	if s == "" || s == "0" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid DISCOVERY_INTERVAL %q: %w", c.DiscoveryInterval, err)
+	}
+	if d < 0 {
+		return 0, fmt.Errorf("invalid DISCOVERY_INTERVAL %q: must not be negative", c.DiscoveryInterval)
+	}
+	return d, nil
 }
