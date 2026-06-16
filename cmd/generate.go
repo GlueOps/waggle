@@ -410,18 +410,23 @@ var generateTerraformOAGCmd = &cobra.Command{
 			return err
 		}
 
-		// Post-process: Huma adds a "$schema" metadata property to response
-		// bodies. The OpenAPI Generator terraform-provider templates render it as
-		// a model field tagged tfsdk:"__schema" — which compiles but the plugin
-		// framework rejects at apply time ("invalid tfsdk tag, must start with a
-		// letter"). It is metadata, not a real resource attribute, so drop it
-		// entirely from the provider models, schema attributes, and mappings.
-		if err := dropTerraformSchemaField(outDir); err != nil {
+		// Post-process: Huma adds a "$schema" metadata property to response bodies.
+		// The OpenAPI Generator renders it as a model field with a $-prefixed Go
+		// identifier ($Schema) tagged tfsdk:"__schema" — which compiles but the
+		// plugin framework rejects at apply time ("invalid tfsdk tag, must start
+		// with a letter").
+		//
+		// De-dollar FIRST so $Schema -> Schema and the field reaches the canonical
+		// form the drop pass below matches; running drop first misses it (the
+		// generator emits the still-$-prefixed identifier), leaving the rejected
+		// tfsdk:"__schema" tag behind. This also normalizes any other $-prefixed
+		// identifiers the generator may emit.
+		if err := patchTerraformDollarIdentifiers(outDir); err != nil {
 			return err
 		}
-		// Safety net for any other "$"-prefixed Go identifiers the generator may
-		// emit (the $schema field above is removed before this runs).
-		if err := patchTerraformDollarIdentifiers(outDir); err != nil {
+		// Now drop the $schema metadata field entirely from the provider models,
+		// schema attributes, and mappings — it is metadata, not a real attribute.
+		if err := dropTerraformSchemaField(outDir); err != nil {
 			return err
 		}
 

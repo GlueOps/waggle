@@ -9,7 +9,6 @@ import (
 
 // DatacentersModel is the Terraform model for datacenters.
 type DatacentersModel struct {
-	Schema             types.String `tfsdk:"__schema"`
 	CreatedAt          types.String `tfsdk:"created_at"`
 	HasToken           types.Bool   `tfsdk:"has_token"`
 	Id                 types.String `tfsdk:"id"`
@@ -22,9 +21,6 @@ type DatacentersModel struct {
 // ToClientModel converts a Terraform model to a client model.
 func (m *DatacentersModel) ToClientModel() *client.DatacenterView {
 	out := &client.DatacenterView{}
-	if !m.Schema.IsNull() && !m.Schema.IsUnknown() {
-		out.Schema = m.Schema.ValueString()
-	}
 	if !m.CreatedAt.IsNull() && !m.CreatedAt.IsUnknown() {
 		out.CreatedAt = m.CreatedAt.ValueString()
 	}
@@ -51,7 +47,6 @@ func (m *DatacentersModel) ToClientModel() *client.DatacenterView {
 
 // FromClientModel updates the Terraform model from a client model.
 func (m *DatacentersModel) FromClientModel(c *client.DatacenterView) {
-	m.Schema = types.StringValue(c.Schema)
 	m.CreatedAt = types.StringValue(c.CreatedAt)
 	m.HasToken = types.BoolValue(c.HasToken)
 	m.Id = types.StringValue(c.Id)
