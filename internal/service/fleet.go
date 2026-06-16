@@ -249,13 +249,17 @@ func (s *FleetService) CreateSlot(ctx context.Context, orgID uuid.UUID, in SlotI
 	return slot, nil
 }
 
-func (s *FleetService) ListSlots(ctx context.Context, orgID uuid.UUID) ([]tenant.Slot, error) {
+func (s *FleetService) ListSlots(ctx context.Context, orgID uuid.UUID, name string) ([]tenant.Slot, error) {
 	db, err := s.db(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
+	q := db.WithContext(ctx).Order("name")
+	if name != "" {
+		q = q.Where("name = ?", name)
+	}
 	var slots []tenant.Slot
-	if err := db.WithContext(ctx).Order("name").Find(&slots).Error; err != nil {
+	if err := q.Find(&slots).Error; err != nil {
 		return nil, fmt.Errorf("list slots: %w", err)
 	}
 	return slots, nil

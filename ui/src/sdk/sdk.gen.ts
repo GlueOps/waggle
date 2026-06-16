@@ -396,7 +396,7 @@ export const listPools = <ThrowOnError extends boolean = false>(options?: Option
 });
 
 /**
- * Create a node pool and place its VMs across hypervisors (anti-affinity spread, all-or-nothing).
+ * Create a node pool and place its VMs across hypervisors (anti-affinity spread, all-or-nothing). Placements are available at GET /pools/{id}/placements.
  */
 export const createPool = <ThrowOnError extends boolean = false>(options: Options<CreatePoolData, ThrowOnError>) => (options.client ?? client).post<CreatePoolResponses, CreatePoolErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -418,7 +418,7 @@ export const deletePool = <ThrowOnError extends boolean = false>(options: Option
 });
 
 /**
- * Fetch a pool and its current placements.
+ * Fetch a pool. Its placements are available at GET /pools/{id}/placements.
  */
 export const getPool = <ThrowOnError extends boolean = false>(options: Options<GetPoolData, ThrowOnError>) => (options.client ?? client).get<GetPoolResponses, GetPoolErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -427,7 +427,7 @@ export const getPool = <ThrowOnError extends boolean = false>(options: Options<G
 });
 
 /**
- * Resize a pool's desired count. Grow places new VMs (all-or-nothing); shrink removes newest placements (LIFO).
+ * Resize a pool's desired count. Grow places new VMs (all-or-nothing); shrink removes newest placements (LIFO). Placements are available at GET /pools/{id}/placements.
  */
 export const resizePool = <ThrowOnError extends boolean = false>(options: Options<ResizePoolData, ThrowOnError>) => (options.client ?? client).patch<ResizePoolResponses, ResizePoolErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

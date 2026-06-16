@@ -453,16 +453,11 @@ export type PoolListOutputBody = {
     items: Array<PoolView> | null;
 };
 
-export type PoolResultBody = {
+export type PoolView = {
     /**
      * A URL to the JSON Schema for this object.
      */
     readonly $schema?: string;
-    placements: Array<PlacementView> | null;
-    pool: PoolView;
-};
-
-export type PoolView = {
     created_at: string;
     datacenter_id: string;
     desired_count: number;
@@ -843,12 +838,18 @@ export type PlacementViewWritable = {
 };
 
 export type PoolListOutputBodyWritable = {
-    items: Array<PoolView> | null;
+    items: Array<PoolViewWritable> | null;
 };
 
-export type PoolResultBodyWritable = {
-    placements: Array<PlacementViewWritable> | null;
-    pool: PoolView;
+export type PoolViewWritable = {
+    created_at: string;
+    datacenter_id: string;
+    desired_count: number;
+    id: string;
+    metadata?: unknown;
+    name: string;
+    slot_id: string;
+    updated_at: string;
 };
 
 export type RefreshInputBodyWritable = {
@@ -1850,7 +1851,7 @@ export type CreatePoolResponses = {
     /**
      * Created
      */
-    201: PoolResultBody;
+    201: PoolView;
 };
 
 export type CreatePoolResponse = CreatePoolResponses[keyof CreatePoolResponses];
@@ -1904,7 +1905,7 @@ export type GetPoolResponses = {
     /**
      * OK
      */
-    200: PoolResultBody;
+    200: PoolView;
 };
 
 export type GetPoolResponse = GetPoolResponses[keyof GetPoolResponses];
@@ -1931,7 +1932,7 @@ export type ResizePoolResponses = {
     /**
      * OK
      */
-    200: PoolResultBody;
+    200: PoolView;
 };
 
 export type ResizePoolResponse = ResizePoolResponses[keyof ResizePoolResponses];
@@ -1966,7 +1967,12 @@ export type ListPoolPlacementsResponse = ListPoolPlacementsResponses[keyof ListP
 export type ListSlotsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        /**
+         * Filter to the slot with this exact (unique) name.
+         */
+        name?: string;
+    };
     url: '/slots';
 };
 

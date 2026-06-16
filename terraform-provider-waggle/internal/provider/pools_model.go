@@ -9,6 +9,7 @@ import (
 
 // PoolsModel is the Terraform model for pools.
 type PoolsModel struct {
+	Schema       types.String `tfsdk:"__schema"`
 	CreatedAt    types.String `tfsdk:"created_at"`
 	DatacenterId types.String `tfsdk:"datacenter_id"`
 	DesiredCount types.Int64  `tfsdk:"desired_count"`
@@ -22,6 +23,9 @@ type PoolsModel struct {
 // ToClientModel converts a Terraform model to a client model.
 func (m *PoolsModel) ToClientModel() *client.PoolView {
 	out := &client.PoolView{}
+	if !m.Schema.IsNull() && !m.Schema.IsUnknown() {
+		out.Schema = m.Schema.ValueString()
+	}
 	if !m.CreatedAt.IsNull() && !m.CreatedAt.IsUnknown() {
 		out.CreatedAt = m.CreatedAt.ValueString()
 	}
@@ -48,6 +52,7 @@ func (m *PoolsModel) ToClientModel() *client.PoolView {
 
 // FromClientModel updates the Terraform model from a client model.
 func (m *PoolsModel) FromClientModel(c *client.PoolView) {
+	m.Schema = types.StringValue(c.Schema)
 	m.CreatedAt = types.StringValue(c.CreatedAt)
 	m.DatacenterId = types.StringValue(c.DatacenterId)
 	m.DesiredCount = types.Int64Value(int64(c.DesiredCount))

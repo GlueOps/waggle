@@ -9,6 +9,7 @@ import (
 
 // SlotsModel is the Terraform model for slots.
 type SlotsModel struct {
+	Schema    types.String `tfsdk:"__schema"`
 	CreatedAt types.String `tfsdk:"created_at"`
 	DiskGb    types.Int64  `tfsdk:"disk_gb"`
 	Id        types.String `tfsdk:"id"`
@@ -21,6 +22,9 @@ type SlotsModel struct {
 // ToClientModel converts a Terraform model to a client model.
 func (m *SlotsModel) ToClientModel() *client.SlotView {
 	out := &client.SlotView{}
+	if !m.Schema.IsNull() && !m.Schema.IsUnknown() {
+		out.Schema = m.Schema.ValueString()
+	}
 	if !m.CreatedAt.IsNull() && !m.CreatedAt.IsUnknown() {
 		out.CreatedAt = m.CreatedAt.ValueString()
 	}
@@ -47,6 +51,7 @@ func (m *SlotsModel) ToClientModel() *client.SlotView {
 
 // FromClientModel updates the Terraform model from a client model.
 func (m *SlotsModel) FromClientModel(c *client.SlotView) {
+	m.Schema = types.StringValue(c.Schema)
 	m.CreatedAt = types.StringValue(c.CreatedAt)
 	m.DiskGb = types.Int64Value(int64(c.DiskGb))
 	m.Id = types.StringValue(c.Id)

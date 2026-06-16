@@ -22,6 +22,8 @@ var _ MappedNullable = &PoolView{}
 
 // PoolView struct for PoolView
 type PoolView struct {
+	// A URL to the JSON Schema for this object.
+	Schema       *string     `json:"$schema,omitempty"`
 	CreatedAt    time.Time   `json:"created_at"`
 	DatacenterId string      `json:"datacenter_id"`
 	DesiredCount int64       `json:"desired_count"`
@@ -56,6 +58,38 @@ func NewPoolView(createdAt time.Time, datacenterId string, desiredCount int64, i
 func NewPoolViewWithDefaults() *PoolView {
 	this := PoolView{}
 	return &this
+}
+
+// GetSchema returns the Schema field value if set, zero value otherwise.
+func (o *PoolView) GetSchema() string {
+	if o == nil || IsNil(o.Schema) {
+		var ret string
+		return ret
+	}
+	return *o.Schema
+}
+
+// GetSchemaOk returns a tuple with the Schema field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *PoolView) GetSchemaOk() (*string, bool) {
+	if o == nil || IsNil(o.Schema) {
+		return nil, false
+	}
+	return o.Schema, true
+}
+
+// HasSchema returns a boolean if a field has been set.
+func (o *PoolView) HasSchema() bool {
+	if o != nil && !IsNil(o.Schema) {
+		return true
+	}
+
+	return false
+}
+
+// SetSchema gets a reference to the given string and assigns it to the Schema field.
+func (o *PoolView) SetSchema(v string) {
+	o.Schema = &v
 }
 
 // GetCreatedAt returns the CreatedAt field value
@@ -269,6 +303,9 @@ func (o PoolView) MarshalJSON() ([]byte, error) {
 
 func (o PoolView) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.Schema) {
+		toSerialize["$schema"] = o.Schema
+	}
 	toSerialize["created_at"] = o.CreatedAt
 	toSerialize["datacenter_id"] = o.DatacenterId
 	toSerialize["desired_count"] = o.DesiredCount

@@ -647,7 +647,7 @@ export const listPoolsOptions = (options?: Options<ListPoolsData>) => queryOptio
 });
 
 /**
- * Create a node pool and place its VMs across hypervisors (anti-affinity spread, all-or-nothing).
+ * Create a node pool and place its VMs across hypervisors (anti-affinity spread, all-or-nothing). Placements are available at GET /pools/{id}/placements.
  */
 export const createPoolMutation = (options?: Partial<Options<CreatePoolData>>): UseMutationOptions<CreatePoolResponse, CreatePoolError, Options<CreatePoolData>> => {
     const mutationOptions: UseMutationOptions<CreatePoolResponse, CreatePoolError, Options<CreatePoolData>> = {
@@ -683,7 +683,7 @@ export const deletePoolMutation = (options?: Partial<Options<DeletePoolData>>): 
 export const getPoolQueryKey = (options: Options<GetPoolData>) => createQueryKey('getPool', options);
 
 /**
- * Fetch a pool and its current placements.
+ * Fetch a pool. Its placements are available at GET /pools/{id}/placements.
  */
 export const getPoolOptions = (options: Options<GetPoolData>) => queryOptions<GetPoolResponse, GetPoolError, GetPoolResponse, ReturnType<typeof getPoolQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -699,7 +699,7 @@ export const getPoolOptions = (options: Options<GetPoolData>) => queryOptions<Ge
 });
 
 /**
- * Resize a pool's desired count. Grow places new VMs (all-or-nothing); shrink removes newest placements (LIFO).
+ * Resize a pool's desired count. Grow places new VMs (all-or-nothing); shrink removes newest placements (LIFO). Placements are available at GET /pools/{id}/placements.
  */
 export const resizePoolMutation = (options?: Partial<Options<ResizePoolData>>): UseMutationOptions<ResizePoolResponse, ResizePoolError, Options<ResizePoolData>> => {
     const mutationOptions: UseMutationOptions<ResizePoolResponse, ResizePoolError, Options<ResizePoolData>> = {

@@ -9,6 +9,7 @@ import (
 
 // HypervisorsModel is the Terraform model for hypervisors.
 type HypervisorsModel struct {
+	Schema         types.String `tfsdk:"__schema"`
 	CpuBookable    types.Int64  `tfsdk:"cpu_bookable"`
 	CpuReserved    types.Int64  `tfsdk:"cpu_reserved"`
 	CpuTotal       types.Int64  `tfsdk:"cpu_total"`
@@ -33,6 +34,9 @@ type HypervisorsModel struct {
 // ToClientModel converts a Terraform model to a client model.
 func (m *HypervisorsModel) ToClientModel() *client.HypervisorView {
 	out := &client.HypervisorView{}
+	if !m.Schema.IsNull() && !m.Schema.IsUnknown() {
+		out.Schema = m.Schema.ValueString()
+	}
 	if !m.CpuBookable.IsNull() && !m.CpuBookable.IsUnknown() {
 		out.CpuBookable = int64(m.CpuBookable.ValueInt64())
 	}
@@ -95,6 +99,7 @@ func (m *HypervisorsModel) ToClientModel() *client.HypervisorView {
 
 // FromClientModel updates the Terraform model from a client model.
 func (m *HypervisorsModel) FromClientModel(c *client.HypervisorView) {
+	m.Schema = types.StringValue(c.Schema)
 	m.CpuBookable = types.Int64Value(int64(c.CpuBookable))
 	m.CpuReserved = types.Int64Value(int64(c.CpuReserved))
 	m.CpuTotal = types.Int64Value(int64(c.CpuTotal))

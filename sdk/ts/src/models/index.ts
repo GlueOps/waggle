@@ -38,7 +38,6 @@ export * from './OrgView';
 export * from './PlacementListOutputBody';
 export * from './PlacementView';
 export * from './PoolListOutputBody';
-export * from './PoolResultBody';
 export * from './PoolView';
 export * from './RefreshInputBody';
 export * from './RefreshOutputBody';

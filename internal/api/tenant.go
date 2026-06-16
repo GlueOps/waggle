@@ -162,6 +162,9 @@ type updateSlotInput struct {
 type slotIDInput struct {
 	ID uuid.UUID `path:"id"`
 }
+type listSlotsInput struct {
+	Name string `query:"name" doc:"Filter to the slot with this exact (unique) name."`
+}
 type slotOutput struct {
 	Body slotView
 }
@@ -376,12 +379,12 @@ func (s *Server) registerTenant(fleet *service.FleetService, tokens *service.Tok
 		Method:      http.MethodGet,
 		Path:        "/slots",
 		Summary:     "List slots in the caller's tenant.",
-	}), func(ctx context.Context, _ *struct{}) (*slotListOutput, error) {
+	}), func(ctx context.Context, in *listSlotsInput) (*slotListOutput, error) {
 		orgID, err := orgFromContext(ctx)
 		if err != nil {
 			return nil, err
 		}
-		slots, err := fleet.ListSlots(ctx, orgID)
+		slots, err := fleet.ListSlots(ctx, orgID, in.Name)
 		if err != nil {
 			return nil, mapFleetError(err)
 		}

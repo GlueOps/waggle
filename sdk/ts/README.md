@@ -65,22 +65,17 @@ All URIs are relative to */api/v1*
 *AuthApi* | [**authSignup**](docs/AuthApi.md#authsignup) | **POST** /auth/signup | Create an account, organization, and first user; enqueue tenant provisioning.
 *AuthApi* | [**authSwitchOrg**](docs/AuthApi.md#authswitchorg) | **POST** /auth/switch | Issue a new token pair scoped to another organization the account belongs to.
 *AuthApi* | [**authVerifyEmail**](docs/AuthApi.md#authverifyemail) | **POST** /auth/verify-email | Consume a verification token to mark an email address verified. Idempotent.
-*FleetApi* | [**createDatacenter**](docs/FleetApi.md#createdatacenter) | **POST** /datacenters | Create a datacenter in the caller\&#39;s tenant.
-*FleetApi* | [**createHypervisor**](docs/FleetApi.md#createhypervisor) | **POST** /hypervisors | Create a hypervisor in the caller\&#39;s tenant.
-*FleetApi* | [**createSlot**](docs/FleetApi.md#createslot) | **POST** /slots | Create a slot (t-shirt-size VM template) in the caller\&#39;s tenant.
-*FleetApi* | [**deleteDatacenter**](docs/FleetApi.md#deletedatacenter) | **DELETE** /datacenters/{id} | Delete a datacenter.
-*FleetApi* | [**deleteHypervisor**](docs/FleetApi.md#deletehypervisor) | **DELETE** /hypervisors/{id} | Delete a hypervisor.
-*FleetApi* | [**deleteSlot**](docs/FleetApi.md#deleteslot) | **DELETE** /slots/{id} | Delete a slot.
-*FleetApi* | [**discoverHypervisors**](docs/FleetApi.md#discoverhypervisors) | **POST** /datacenters/{id}/discover | Discover hypervisors from the datacenter\&#39;s Proxmox cluster and upsert them (preserving reserved capacity and schedulable). Set async to run in the background.
-*FleetApi* | [**getDatacenter**](docs/FleetApi.md#getdatacenter) | **GET** /datacenters/{id} | Fetch a datacenter by ID.
-*FleetApi* | [**getHypervisor**](docs/FleetApi.md#gethypervisor) | **GET** /hypervisors/{id} | Fetch a hypervisor by ID.
-*FleetApi* | [**getSlot**](docs/FleetApi.md#getslot) | **GET** /slots/{id} | Fetch a slot by ID.
-*FleetApi* | [**listDatacenters**](docs/FleetApi.md#listdatacenters) | **GET** /datacenters | List datacenters in the caller\&#39;s tenant.
-*FleetApi* | [**listHypervisors**](docs/FleetApi.md#listhypervisors) | **GET** /hypervisors | List hypervisors in the caller\&#39;s tenant.
-*FleetApi* | [**listSlots**](docs/FleetApi.md#listslots) | **GET** /slots | List slots in the caller\&#39;s tenant.
-*FleetApi* | [**updateDatacenter**](docs/FleetApi.md#updatedatacenter) | **PUT** /datacenters/{id} | Update a datacenter.
-*FleetApi* | [**updateHypervisor**](docs/FleetApi.md#updatehypervisor) | **PUT** /hypervisors/{id} | Update a hypervisor.
-*FleetApi* | [**updateSlot**](docs/FleetApi.md#updateslot) | **PUT** /slots/{id} | Update a slot.
+*DatacentersApi* | [**createDatacenter**](docs/DatacentersApi.md#createdatacenter) | **POST** /datacenters | Create a datacenter in the caller\&#39;s tenant.
+*DatacentersApi* | [**deleteDatacenter**](docs/DatacentersApi.md#deletedatacenter) | **DELETE** /datacenters/{id} | Delete a datacenter.
+*DatacentersApi* | [**discoverHypervisors**](docs/DatacentersApi.md#discoverhypervisors) | **POST** /datacenters/{id}/discover | Discover hypervisors from the datacenter\&#39;s Proxmox cluster and upsert them (preserving reserved capacity and schedulable). Set async to run in the background.
+*DatacentersApi* | [**getDatacenter**](docs/DatacentersApi.md#getdatacenter) | **GET** /datacenters/{id} | Fetch a datacenter by ID.
+*DatacentersApi* | [**listDatacenters**](docs/DatacentersApi.md#listdatacenters) | **GET** /datacenters | List datacenters in the caller\&#39;s tenant.
+*DatacentersApi* | [**updateDatacenter**](docs/DatacentersApi.md#updatedatacenter) | **PUT** /datacenters/{id} | Update a datacenter.
+*HypervisorsApi* | [**createHypervisor**](docs/HypervisorsApi.md#createhypervisor) | **POST** /hypervisors | Create a hypervisor in the caller\&#39;s tenant.
+*HypervisorsApi* | [**deleteHypervisor**](docs/HypervisorsApi.md#deletehypervisor) | **DELETE** /hypervisors/{id} | Delete a hypervisor.
+*HypervisorsApi* | [**getHypervisor**](docs/HypervisorsApi.md#gethypervisor) | **GET** /hypervisors/{id} | Fetch a hypervisor by ID.
+*HypervisorsApi* | [**listHypervisors**](docs/HypervisorsApi.md#listhypervisors) | **GET** /hypervisors | List hypervisors in the caller\&#39;s tenant.
+*HypervisorsApi* | [**updateHypervisor**](docs/HypervisorsApi.md#updatehypervisor) | **PUT** /hypervisors/{id} | Update a hypervisor.
 *OrganizationsApi* | [**addMember**](docs/OrganizationsApi.md#addmember) | **POST** /organizations/{id}/members | Add or invite a member by email (admin+; owner required to grant owner). Unknown emails get an invite link.
 *OrganizationsApi* | [**createOrg**](docs/OrganizationsApi.md#createorg) | **POST** /organizations | Create an organization (you become its owner) and enqueue tenant provisioning.
 *OrganizationsApi* | [**deleteOrg**](docs/OrganizationsApi.md#deleteorg) | **DELETE** /organizations/{id} | Delete an organization and enqueue tenant teardown (owner only).
@@ -91,13 +86,18 @@ All URIs are relative to */api/v1*
 *OrganizationsApi* | [**updateMember**](docs/OrganizationsApi.md#updatemember) | **PATCH** /organizations/{id}/members/{userId} | Change a member\&#39;s role (admin+; owner required to touch owners).
 *OrganizationsApi* | [**updateOrg**](docs/OrganizationsApi.md#updateorg) | **PATCH** /organizations/{id} | Rename an organization (admin or owner).
 *PlacementApi* | [**backfillPlacementVmid**](docs/PlacementApi.md#backfillplacementvmid) | **PATCH** /placements/{id} | Attach the externally-assigned Proxmox vmid to a placement.
-*PlacementApi* | [**createPool**](docs/PlacementApi.md#createpool) | **POST** /pools | Create a node pool and place its VMs across hypervisors (anti-affinity spread, all-or-nothing).
-*PlacementApi* | [**deletePool**](docs/PlacementApi.md#deletepool) | **DELETE** /pools/{id} | Delete a pool and release all its placements.
-*PlacementApi* | [**getPool**](docs/PlacementApi.md#getpool) | **GET** /pools/{id} | Fetch a pool and its current placements.
 *PlacementApi* | [**listPlacements**](docs/PlacementApi.md#listplacements) | **GET** /placements | List all placements in the tenant with pool, slot, and hypervisor context (fleet overview).
-*PlacementApi* | [**listPoolPlacements**](docs/PlacementApi.md#listpoolplacements) | **GET** /pools/{id}/placements | List a pool\&#39;s placements (hypervisor + optional vmid).
-*PlacementApi* | [**listPools**](docs/PlacementApi.md#listpools) | **GET** /pools | List node pools in the caller\&#39;s tenant.
-*PlacementApi* | [**resizePool**](docs/PlacementApi.md#resizepool) | **PATCH** /pools/{id} | Resize a pool\&#39;s desired count. Grow places new VMs (all-or-nothing); shrink removes newest placements (LIFO).
+*PoolsApi* | [**createPool**](docs/PoolsApi.md#createpool) | **POST** /pools | Create a node pool and place its VMs across hypervisors (anti-affinity spread, all-or-nothing). Placements are available at GET /pools/{id}/placements.
+*PoolsApi* | [**deletePool**](docs/PoolsApi.md#deletepool) | **DELETE** /pools/{id} | Delete a pool and release all its placements.
+*PoolsApi* | [**getPool**](docs/PoolsApi.md#getpool) | **GET** /pools/{id} | Fetch a pool. Its placements are available at GET /pools/{id}/placements.
+*PoolsApi* | [**listPoolPlacements**](docs/PoolsApi.md#listpoolplacements) | **GET** /pools/{id}/placements | List a pool\&#39;s placements (hypervisor + optional vmid).
+*PoolsApi* | [**listPools**](docs/PoolsApi.md#listpools) | **GET** /pools | List node pools in the caller\&#39;s tenant.
+*PoolsApi* | [**resizePool**](docs/PoolsApi.md#resizepool) | **PATCH** /pools/{id} | Resize a pool\&#39;s desired count. Grow places new VMs (all-or-nothing); shrink removes newest placements (LIFO). Placements are available at GET /pools/{id}/placements.
+*SlotsApi* | [**createSlot**](docs/SlotsApi.md#createslot) | **POST** /slots | Create a slot (t-shirt-size VM template) in the caller\&#39;s tenant.
+*SlotsApi* | [**deleteSlot**](docs/SlotsApi.md#deleteslot) | **DELETE** /slots/{id} | Delete a slot.
+*SlotsApi* | [**getSlot**](docs/SlotsApi.md#getslot) | **GET** /slots/{id} | Fetch a slot by ID.
+*SlotsApi* | [**listSlots**](docs/SlotsApi.md#listslots) | **GET** /slots | List slots in the caller\&#39;s tenant.
+*SlotsApi* | [**updateSlot**](docs/SlotsApi.md#updateslot) | **PUT** /slots/{id} | Update a slot.
 *SystemApi* | [**health**](docs/SystemApi.md#health) | **GET** /health | Health check
 
 
@@ -141,7 +141,6 @@ All URIs are relative to */api/v1*
 - [PlacementListOutputBody](docs/PlacementListOutputBody.md)
 - [PlacementView](docs/PlacementView.md)
 - [PoolListOutputBody](docs/PoolListOutputBody.md)
-- [PoolResultBody](docs/PoolResultBody.md)
 - [PoolView](docs/PoolView.md)
 - [RefreshInputBody](docs/RefreshInputBody.md)
 - [RefreshOutputBody](docs/RefreshOutputBody.md)

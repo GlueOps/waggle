@@ -20,6 +20,12 @@ import { mapValues } from '../runtime';
  */
 export interface PoolView {
     /**
+     * A URL to the JSON Schema for this object.
+     * @type {string}
+     * @memberof PoolView
+     */
+    readonly $schema?: string;
+    /**
      * 
      * @type {Date}
      * @memberof PoolView
@@ -93,6 +99,7 @@ export function PoolViewFromJSONTyped(json: any, ignoreDiscriminator: boolean): 
     }
     return {
         
+        '$schema': json['$schema'] == null ? undefined : json['$schema'],
         'createdAt': (new Date(json['created_at'])),
         'datacenterId': json['datacenter_id'],
         'desiredCount': json['desired_count'],
@@ -108,7 +115,7 @@ export function PoolViewToJSON(json: any): PoolView {
     return PoolViewToJSONTyped(json, false);
 }
 
-export function PoolViewToJSONTyped(value?: PoolView | null, ignoreDiscriminator: boolean = false): any {
+export function PoolViewToJSONTyped(value?: Omit<PoolView, '$schema'> | null, ignoreDiscriminator: boolean = false): any {
     if (value == null) {
         return value;
     }

@@ -293,7 +293,7 @@ paths:
       - bearer: []
       summary: List datacenters in the caller's tenant.
       tags:
-      - fleet
+      - datacenters
     post:
       operationId: create-datacenter
       requestBody:
@@ -319,7 +319,7 @@ paths:
       - bearer: []
       summary: Create a datacenter in the caller's tenant.
       tags:
-      - fleet
+      - datacenters
   /datacenters/{id}:
     delete:
       operationId: delete-datacenter
@@ -344,7 +344,7 @@ paths:
       - bearer: []
       summary: Delete a datacenter.
       tags:
-      - fleet
+      - datacenters
     get:
       operationId: get-datacenter
       parameters:
@@ -372,7 +372,7 @@ paths:
       - bearer: []
       summary: Fetch a datacenter by ID.
       tags:
-      - fleet
+      - datacenters
     put:
       operationId: update-datacenter
       parameters:
@@ -406,7 +406,7 @@ paths:
       - bearer: []
       summary: Update a datacenter.
       tags:
-      - fleet
+      - datacenters
   /datacenters/{id}/discover:
     post:
       operationId: discover-hypervisors
@@ -443,7 +443,7 @@ paths:
         them (preserving reserved capacity and schedulable). Set async to run in the
         background.
       tags:
-      - fleet
+      - datacenters
   /health:
     get:
       operationId: health
@@ -491,7 +491,7 @@ paths:
       - bearer: []
       summary: List hypervisors in the caller's tenant.
       tags:
-      - fleet
+      - hypervisors
     post:
       operationId: create-hypervisor
       requestBody:
@@ -517,7 +517,7 @@ paths:
       - bearer: []
       summary: Create a hypervisor in the caller's tenant.
       tags:
-      - fleet
+      - hypervisors
   /hypervisors/{id}:
     delete:
       operationId: delete-hypervisor
@@ -542,7 +542,7 @@ paths:
       - bearer: []
       summary: Delete a hypervisor.
       tags:
-      - fleet
+      - hypervisors
     get:
       operationId: get-hypervisor
       parameters:
@@ -570,7 +570,7 @@ paths:
       - bearer: []
       summary: Fetch a hypervisor by ID.
       tags:
-      - fleet
+      - hypervisors
     put:
       operationId: update-hypervisor
       parameters:
@@ -604,7 +604,7 @@ paths:
       - bearer: []
       summary: Update a hypervisor.
       tags:
-      - fleet
+      - hypervisors
   /organizations:
     get:
       operationId: list-orgs
@@ -954,7 +954,7 @@ paths:
       - bearer: []
       summary: List node pools in the caller's tenant.
       tags:
-      - placement
+      - pools
     post:
       operationId: create-pool
       requestBody:
@@ -968,7 +968,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PoolResultBody"
+                $ref: "#/components/schemas/PoolView"
           description: Created
         default:
           content:
@@ -979,9 +979,9 @@ paths:
       security:
       - bearer: []
       summary: "Create a node pool and place its VMs across hypervisors (anti-affinity\
-        \ spread, all-or-nothing)."
+        \ spread, all-or-nothing). Placements are available at GET /pools/{id}/placements."
       tags:
-      - placement
+      - pools
   /pools/{id}:
     delete:
       operationId: delete-pool
@@ -1006,7 +1006,7 @@ paths:
       - bearer: []
       summary: Delete a pool and release all its placements.
       tags:
-      - placement
+      - pools
     get:
       operationId: get-pool
       parameters:
@@ -1022,7 +1022,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PoolResultBody"
+                $ref: "#/components/schemas/PoolView"
           description: OK
         default:
           content:
@@ -1032,9 +1032,9 @@ paths:
           description: Error
       security:
       - bearer: []
-      summary: Fetch a pool and its current placements.
+      summary: "Fetch a pool. Its placements are available at GET /pools/{id}/placements."
       tags:
-      - placement
+      - pools
     patch:
       operationId: resize-pool
       parameters:
@@ -1056,7 +1056,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PoolResultBody"
+                $ref: "#/components/schemas/PoolView"
           description: OK
         default:
           content:
@@ -1066,10 +1066,11 @@ paths:
           description: Error
       security:
       - bearer: []
-      summary: Resize a pool's desired count. Grow places new VMs (all-or-nothing);
-        shrink removes newest placements (LIFO).
+      summary: "Resize a pool's desired count. Grow places new VMs (all-or-nothing);\
+        \ shrink removes newest placements (LIFO). Placements are available at GET\
+        \ /pools/{id}/placements."
       tags:
-      - placement
+      - pools
   /pools/{id}/placements:
     get:
       operationId: list-pool-placements
@@ -1098,10 +1099,20 @@ paths:
       - bearer: []
       summary: List a pool's placements (hypervisor + optional vmid).
       tags:
-      - placement
+      - pools
   /slots:
     get:
       operationId: list-slots
+      parameters:
+      - description: Filter to the slot with this exact (unique) name.
+        explode: false
+        in: query
+        name: name
+        required: false
+        schema:
+          description: Filter to the slot with this exact (unique) name.
+          type: string
+        style: form
       responses:
         "200":
           content:
@@ -1119,7 +1130,7 @@ paths:
       - bearer: []
       summary: List slots in the caller's tenant.
       tags:
-      - fleet
+      - slots
     post:
       operationId: create-slot
       requestBody:
@@ -1145,7 +1156,7 @@ paths:
       - bearer: []
       summary: Create a slot (t-shirt-size VM template) in the caller's tenant.
       tags:
-      - fleet
+      - slots
   /slots/{id}:
     delete:
       operationId: delete-slot
@@ -1170,7 +1181,7 @@ paths:
       - bearer: []
       summary: Delete a slot.
       tags:
-      - fleet
+      - slots
     get:
       operationId: get-slot
       parameters:
@@ -1198,7 +1209,7 @@ paths:
       - bearer: []
       summary: Fetch a slot by ID.
       tags:
-      - fleet
+      - slots
     put:
       operationId: update-slot
       parameters:
@@ -1232,7 +1243,7 @@ paths:
       - bearer: []
       summary: Update a slot.
       tags:
-      - fleet
+      - slots
 components:
   schemas:
     AcceptInviteInputBody:
@@ -2499,6 +2510,7 @@ components:
         $schema: https://openapi-generator.tech
         items:
         - metadata: ""
+          $schema: https://openapi-generator.tech
           updated_at: 2000-01-23T04:56:07.000+00:00
           slot_id: slot_id
           name: name
@@ -2507,6 +2519,7 @@ components:
           id: id
           datacenter_id: datacenter_id
         - metadata: ""
+          $schema: https://openapi-generator.tech
           updated_at: 2000-01-23T04:56:07.000+00:00
           slot_id: slot_id
           name: name
@@ -2527,52 +2540,11 @@ components:
           type: array
       required:
       - items
-    PoolResultBody:
-      additionalProperties: false
-      example:
-        $schema: https://openapi-generator.tech
-        pool:
-          metadata: ""
-          updated_at: 2000-01-23T04:56:07.000+00:00
-          slot_id: slot_id
-          name: name
-          created_at: 2000-01-23T04:56:07.000+00:00
-          desired_count: 0
-          id: id
-          datacenter_id: datacenter_id
-        placements:
-        - $schema: https://openapi-generator.tech
-          vmid: 0
-          hypervisor_name: hypervisor_name
-          created_at: 2000-01-23T04:56:07.000+00:00
-          hypervisor_id: hypervisor_id
-          id: id
-        - $schema: https://openapi-generator.tech
-          vmid: 0
-          hypervisor_name: hypervisor_name
-          created_at: 2000-01-23T04:56:07.000+00:00
-          hypervisor_id: hypervisor_id
-          id: id
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          format: uri
-          readOnly: true
-          type: string
-        placements:
-          items:
-            $ref: "#/components/schemas/PlacementView"
-          nullable: true
-          type: array
-        pool:
-          $ref: "#/components/schemas/PoolView"
-      required:
-      - placements
-      - pool
     PoolView:
       additionalProperties: false
       example:
         metadata: ""
+        $schema: https://openapi-generator.tech
         updated_at: 2000-01-23T04:56:07.000+00:00
         slot_id: slot_id
         name: name
@@ -2581,6 +2553,11 @@ components:
         id: id
         datacenter_id: datacenter_id
       properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
         created_at:
           format: date-time
           type: string

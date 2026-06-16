@@ -52,11 +52,17 @@ type APIClient struct {
 
 	AuthAPI *AuthAPIService
 
-	FleetAPI *FleetAPIService
+	DatacentersAPI *DatacentersAPIService
+
+	HypervisorsAPI *HypervisorsAPIService
 
 	OrganizationsAPI *OrganizationsAPIService
 
 	PlacementAPI *PlacementAPIService
+
+	PoolsAPI *PoolsAPIService
+
+	SlotsAPI *SlotsAPIService
 
 	SystemAPI *SystemAPIService
 }
@@ -79,9 +85,12 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	// API Services
 	c.ApiKeysAPI = (*ApiKeysAPIService)(&c.common)
 	c.AuthAPI = (*AuthAPIService)(&c.common)
-	c.FleetAPI = (*FleetAPIService)(&c.common)
+	c.DatacentersAPI = (*DatacentersAPIService)(&c.common)
+	c.HypervisorsAPI = (*HypervisorsAPIService)(&c.common)
 	c.OrganizationsAPI = (*OrganizationsAPIService)(&c.common)
 	c.PlacementAPI = (*PlacementAPIService)(&c.common)
+	c.PoolsAPI = (*PoolsAPIService)(&c.common)
+	c.SlotsAPI = (*SlotsAPIService)(&c.common)
 	c.SystemAPI = (*SystemAPIService)(&c.common)
 
 	return c

@@ -6,6 +6,7 @@
 
 Name | Type
 ------------ | -------------
+`$schema` | string
 `createdAt` | Date
 `datacenterId` | string
 `desiredCount` | number
@@ -22,6 +23,7 @@ import type { PoolView } from '@glueops/waggle-sdk'
 
 // TODO: Update the object below with actual values
 const example = {
+  "$schema": null,
   "createdAt": null,
   "datacenterId": null,
   "desiredCount": null,
