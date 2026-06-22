@@ -398,15 +398,15 @@ func (s *FleetService) BackfillVMID(ctx context.Context, orgID, placementID uuid
 	if err != nil {
 		return nil, err
 	}
-	var pl tenant.Placement
-	if err := db.WithContext(ctx).First(&pl, "id = ?", placementID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("load placement: %w", err)
+	res := db.WithContext(ctx).
+		Model(&tenant.Placement{}).
+		Where("id = ?", placementID).
+		Update("vmid", vmid)
+	if res.Error != nil {
+		return nil, fmt.Errorf("update vmid: %w", res.Error)
 	}
-	if err := db.WithContext(ctx).Model(&pl).Update("vmid", &vmid).Error; err != nil {
-		return nil, fmt.Errorf("update vmid: %w", err)
+	if res.RowsAffected == 0 {
+		return nil, ErrNotFound
 	}
 	return placementByID(ctx, db, placementID)
 }
@@ -414,12 +414,12 @@ func (s *FleetService) BackfillVMID(ctx context.Context, orgID, placementID uuid
 // placementByID fetches a single placement row joined with its hypervisor name.
 func placementByID(ctx context.Context, db *gorm.DB, placementID uuid.UUID) (*PlacementView, error) {
 	type row struct {
-		ID             uuid.UUID
-		PoolID         uuid.UUID
-		HypervisorID   uuid.UUID
-		HypervisorName string
-		VMID           *int
-		CreatedAt      time.Time
+		ID             uuid.UUID `gorm:"column:id"`
+		PoolID         uuid.UUID `gorm:"column:pool_id"`
+		HypervisorID   uuid.UUID `gorm:"column:hypervisor_id"`
+		HypervisorName string    `gorm:"column:hypervisor_name"`
+		VMID           *int      `gorm:"column:vmid"`
+		CreatedAt      time.Time `gorm:"column:created_at"`
 	}
 	var r row
 	if err := db.WithContext(ctx).
@@ -476,17 +476,17 @@ func (s *FleetService) loadPoolResult(ctx context.Context, db *gorm.DB, poolID u
 // FleetPlacementView is a tenant-wide placement enriched with its pool, slot,
 // and hypervisor context for overview displays.
 type FleetPlacementView struct {
-	ID             uuid.UUID
-	PoolID         uuid.UUID
-	PoolName       string
-	HypervisorID   uuid.UUID
-	HypervisorName string
-	SlotName       string
-	VCPU           int
-	RAMGB          int
-	DiskGB         int
-	VMID           *int
-	CreatedAt      time.Time
+	ID             uuid.UUID `gorm:"column:id"`
+	PoolID         uuid.UUID `gorm:"column:pool_id"`
+	PoolName       string    `gorm:"column:pool_name"`
+	HypervisorID   uuid.UUID `gorm:"column:hypervisor_id"`
+	HypervisorName string    `gorm:"column:hypervisor_name"`
+	SlotName       string    `gorm:"column:slot_name"`
+	VCPU           int       `gorm:"column:vcpu"`
+	RAMGB          int       `gorm:"column:ram_gb"`
+	DiskGB         int       `gorm:"column:disk_gb"`
+	VMID           *int      `gorm:"column:vmid"`
+	CreatedAt      time.Time `gorm:"column:created_at"`
 }
 
 // ListAllPlacements returns every placement in the caller's tenant, newest

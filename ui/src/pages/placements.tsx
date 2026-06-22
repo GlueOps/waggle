@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Plus } from "lucide-react"
 
 import {
   listPlacementsOptions,
@@ -21,9 +22,17 @@ import { PageShell } from "@/components/crud/page-shell"
 import { RowActions } from "@/components/crud/row-actions"
 import { FormDialog } from "@/components/crud/form-dialog"
 import { CopyId } from "@/components/ui/copy-id"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { errMsg } from "@/lib/errors"
 
 export function PlacementsPage() {
@@ -32,6 +41,8 @@ export function PlacementsPage() {
   const items = list.data?.items ?? []
 
   const [backfilling, setBackfilling] = useState<FleetPlacementView | null>(null)
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [assignTarget, setAssignTarget] = useState<string>("")
   const [vmidInput, setVmidInput] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -39,6 +50,30 @@ export function PlacementsPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: listPlacementsQueryKey() })
   const backfillMut = useMutation(backfillPlacementVmidMutation())
   const deleteMut = useMutation(deletePlacementMutation())
+
+  // Unassigned placements available for top-level assign dialog
+  const unassigned = items.filter((p) => p.vmid == null)
+
+  function openAssign() {
+    setAssignTarget(unassigned[0]?.id ?? "")
+    setVmidInput("")
+    setError(null)
+    setAssignOpen(true)
+  }
+
+  async function submitAssign() {
+    const vmid = parseInt(vmidInput, 10)
+    if (!assignTarget) { setError("Select a placement"); return }
+    if (!vmid || vmid < 1) { setError("vmid must be a positive integer"); return }
+    setError(null)
+    try {
+      await backfillMut.mutateAsync({ body: { vmid }, path: { id: assignTarget } })
+      await invalidate()
+      setAssignOpen(false)
+    } catch (e) {
+      setError(errMsg(e))
+    }
+  }
 
   async function submitBackfill() {
     if (!backfilling) return
@@ -95,6 +130,11 @@ export function PlacementsPage() {
       onDismissNotice={() => setNotice(null)}
       empty={items.length === 0}
       emptyText="No placements yet. Create a pool to place VMs."
+      action={
+        <Button onClick={openAssign} disabled={unassigned.length === 0}>
+          <Plus className="size-4" /> Assign VM
+        </Button>
+      }
     >
       {rollup.length > 0 && (
         <Card className="mb-4">
@@ -174,6 +214,47 @@ export function PlacementsPage() {
           ))}
         </TableBody>
       </Table>
+
+      <FormDialog
+        open={assignOpen}
+        onOpenChange={(o) => { if (!o) setAssignOpen(false) }}
+        title="Assign VM to placement"
+        description="Select an unassigned placement and enter the Proxmox vmid of the VM that was created for it."
+        onSubmit={() => void submitAssign()}
+        submitting={backfillMut.isPending}
+        error={error}
+        submitLabel="Assign"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="assign-placement">Placement</Label>
+            <Select value={assignTarget} onValueChange={setAssignTarget}>
+              <SelectTrigger id="assign-placement">
+                <SelectValue placeholder="Select a placement…" />
+              </SelectTrigger>
+              <SelectContent>
+                {unassigned.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.pool_name} — {p.hypervisor_name} ({p.id.slice(0, 8)}…)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="assign-vmid">Proxmox VMID</Label>
+            <Input
+              id="assign-vmid"
+              type="number"
+              min={1}
+              placeholder="e.g. 100"
+              value={vmidInput}
+              onChange={(e) => setVmidInput(e.target.value)}
+              required
+            />
+          </div>
+        </div>
+      </FormDialog>
 
       <FormDialog
         open={backfilling !== null}

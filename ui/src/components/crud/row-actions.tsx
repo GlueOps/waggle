@@ -27,7 +27,7 @@ export function RowActions({ actions }: { actions: RowAction[] }) {
           <DropdownMenuItem
             key={a.label}
             variant={a.variant}
-            onSelect={a.onSelect}
+            onSelect={() => setTimeout(a.onSelect, 0)}
           >
             {a.label}
           </DropdownMenuItem>

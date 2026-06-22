@@ -74,9 +74,11 @@ export function DashboardPage() {
   const placements = plQ.data?.items ?? []
   const pools = poolQ.data?.items ?? []
 
-  // Pending (Waggle-placed) capacity per hypervisor name, from the ledger.
+  // Pending (Waggle-placed, not yet provisioned) capacity per hypervisor.
+  // Placements with a vmid already have a real VM running; exclude them.
   const pendingByHv = new Map<string, { cpu: number; ram: number; disk: number }>()
   for (const p of placements) {
+    if (p.vmid != null) continue
     const cur = pendingByHv.get(p.hypervisor_name) ?? { cpu: 0, ram: 0, disk: 0 }
     cur.cpu += p.vcpu
     cur.ram += p.ram_gb
