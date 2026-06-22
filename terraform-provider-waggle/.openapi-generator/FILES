@@ -71,9 +71,9 @@ internal/provider/hypervisors_resource.go
 internal/provider/organizations_data_source.go
 internal/provider/organizations_model.go
 internal/provider/organizations_resource.go
-internal/provider/placement_data_source.go
-internal/provider/placement_model.go
-internal/provider/placement_resource.go
+internal/provider/placements_data_source.go
+internal/provider/placements_model.go
+internal/provider/placements_resource.go
 internal/provider/pools_data_source.go
 internal/provider/pools_model.go
 internal/provider/pools_resource.go

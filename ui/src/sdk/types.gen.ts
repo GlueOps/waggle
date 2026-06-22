@@ -442,8 +442,45 @@ export type PlacementView = {
     hypervisor_id: string;
     hypervisor_name: string;
     id: string;
+    pool_id: string;
     vmid?: number;
 };
+
+export type GetPlacementData = {
+    path: { id: string };
+    url: '/placements/{id}';
+};
+
+export type GetPlacementErrors = {
+    404: unknown;
+    422: unknown;
+};
+
+export type GetPlacementError = GetPlacementErrors[keyof GetPlacementErrors];
+
+export type GetPlacementResponses = {
+    200: PlacementView;
+};
+
+export type GetPlacementResponse = GetPlacementResponses[keyof GetPlacementResponses];
+
+export type DeletePlacementData = {
+    path: { id: string };
+    url: '/placements/{id}';
+};
+
+export type DeletePlacementErrors = {
+    404: unknown;
+    422: unknown;
+};
+
+export type DeletePlacementError = DeletePlacementErrors[keyof DeletePlacementErrors];
+
+export type DeletePlacementResponses = {
+    204: void;
+};
+
+export type DeletePlacementResponse = DeletePlacementResponses[keyof DeletePlacementResponses];
 
 export type PoolListOutputBody = {
     /**

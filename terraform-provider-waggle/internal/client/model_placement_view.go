@@ -6,8 +6,9 @@ package client
 type PlacementView struct {
 	Schema string `json:"$schema,omitempty"`
 	CreatedAt string `json:"created_at,omitempty"`
-	HypervisorId string `json:"hypervisor_id"`
-	HypervisorName string `json:"hypervisor_name"`
+	HypervisorId string `json:"hypervisor_id,omitempty"`
+	HypervisorName string `json:"hypervisor_name,omitempty"`
 	Id string `json:"id,omitempty"`
+	PoolId string `json:"pool_id,omitempty"`
 	Vmid int64 `json:"vmid,omitempty"`
 }

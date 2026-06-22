@@ -6,10 +6,10 @@ package client
 type FleetPlacementView struct {
 	CreatedAt string `json:"created_at,omitempty"`
 	DiskGb int64 `json:"disk_gb"`
-	HypervisorId string `json:"hypervisor_id"`
-	HypervisorName string `json:"hypervisor_name"`
+	HypervisorId string `json:"hypervisor_id,omitempty"`
+	HypervisorName string `json:"hypervisor_name,omitempty"`
 	Id string `json:"id,omitempty"`
-	PoolId string `json:"pool_id"`
+	PoolId string `json:"pool_id,omitempty"`
 	PoolName string `json:"pool_name"`
 	RamGb int64 `json:"ram_gb"`
 	SlotName string `json:"slot_name"`

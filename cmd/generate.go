@@ -41,6 +41,14 @@ var poolPlacementsDataSourceSrc string
 //go:embed overlays/slots_data_source.go.tmpl
 var slotsDataSourceSrc string
 
+// placementResourceSrc is a hand-authored replacement for the generated
+// placements_resource.go. The generator produces a stub with no schema and a
+// broken Create; this overlay provides a full CRUD implementation that adopts
+// an existing waggle placement into Terraform state and backfills its vmid.
+//
+//go:embed overlays/placement_resource.go.tmpl
+var placementResourceSrc string
+
 var generateMigrationsCmd = &cobra.Command{
 	Use:   "migrations [name]",
 	Short: "Generate Goose migrations from GORM models",
@@ -441,16 +449,17 @@ var generateTerraformOAGCmd = &cobra.Command{
 			return err
 		}
 
+		// Inject hand-authored provider overlays before patching schema roles so
+		// patchResourceSchemaRoles can validate the overlay's attribute roles
+		// idempotently (overlay already has correct roles; patch is a no-op).
+		if err := writeProviderOverlays(outDir); err != nil {
+			return err
+		}
+
 		// Correct resource attribute roles: the generator marks every field
 		// Required, forcing server-assigned fields (id, created_at, ...) into
 		// config and causing perpetual diffs. Reclassify per the spec.
 		if err := patchResourceSchemaRoles(outDir); err != nil {
-			return err
-		}
-
-		// Inject hand-authored provider overlays (data sources the generator
-		// can't model) and register them in the generated provider.go.
-		if err := writeProviderOverlays(outDir); err != nil {
 			return err
 		}
 
@@ -566,6 +575,20 @@ var resourceSchemaRoles = map[string]map[string]schemaRole{
 		"created_at":    roleComputed,
 		"updated_at":    roleComputed,
 	},
+	// placements_resource.go is a full hand-authored overlay (writeProviderOverlays
+	// runs before patchResourceSchemaRoles). The schema roles here serve two
+	// purposes: (1) patchClientReadOnlyOmitempty adds omitempty to the generated
+	// PlacementView client model for server-assigned fields; (2) patchResourceSchemaRoles
+	// validates idempotently that the overlay already has the correct roles.
+	"placements": {
+		"placement_id":   roleRequired,
+		"id":             roleComputed,
+		"vmid":           roleOptional,
+		"pool_id":        roleComputed,
+		"hypervisor_id":  roleComputed,
+		"hypervisor_name": roleComputed,
+		"created_at":     roleComputed,
+	},
 }
 
 // patchResourceSchemaRoles rewrites the flag line of each classified attribute
@@ -620,7 +643,18 @@ func writeProviderOverlays(outDir string) error {
 		return fmt.Errorf("write overlay %s: %w", slotsDst, err)
 	}
 
-	log.Printf("injected provider overlays pool_placements_data_source.go and slots_data_source.go")
+	// Overwrite the generated placements_resource.go with the hand-authored
+	// overlay that implements full CRUD (adopt/backfill-vmid/delete). The
+	// generator produces a correct stub (no Create, schema from view model)
+	// but the overlay provides a richer schema and proper Create semantics.
+	// The generator already declares NewPlacementsResource and registers it in
+	// provider.go, so no separate registration is needed here.
+	placementsDst := filepath.Join(providerDir, "placements_resource.go")
+	if err := os.WriteFile(placementsDst, []byte(placementResourceSrc), 0o644); err != nil {
+		return fmt.Errorf("write overlay %s: %w", placementsDst, err)
+	}
+
+	log.Printf("injected provider overlays: pool_placements_data_source.go, slots_data_source.go, placements_resource.go")
 	return nil
 }
 

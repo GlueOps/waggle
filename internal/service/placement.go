@@ -194,6 +194,7 @@ func (in PoolInput) validate() error {
 
 type PlacementView struct {
 	ID             uuid.UUID
+	PoolID         uuid.UUID
 	HypervisorID   uuid.UUID
 	HypervisorName string
 	VMID           *int
@@ -363,9 +364,36 @@ func (s *FleetService) ListPlacements(ctx context.Context, orgID, poolID uuid.UU
 	return placementsForPool(ctx, db, poolID)
 }
 
+// GetPlacement returns a single placement by ID, joined with its hypervisor name.
+func (s *FleetService) GetPlacement(ctx context.Context, orgID, placementID uuid.UUID) (*PlacementView, error) {
+	db, err := s.db(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	return placementByID(ctx, db, placementID)
+}
+
+// DeletePlacement removes a single placement from its pool. The pool's
+// desired_count is NOT adjusted; callers should resize the pool separately
+// if they want waggle to re-fill the vacancy.
+func (s *FleetService) DeletePlacement(ctx context.Context, orgID, placementID uuid.UUID) error {
+	db, err := s.db(ctx, orgID)
+	if err != nil {
+		return err
+	}
+	res := db.WithContext(ctx).Delete(&tenant.Placement{}, "id = ?", placementID)
+	if res.Error != nil {
+		return fmt.Errorf("delete placement: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // BackfillVMID attaches the externally-assigned Proxmox vmid to a placement
 // (the BGP/Proxmox pipeline calls this after the VM is created).
-func (s *FleetService) BackfillVMID(ctx context.Context, orgID, placementID uuid.UUID, vmid int) (*tenant.Placement, error) {
+func (s *FleetService) BackfillVMID(ctx context.Context, orgID, placementID uuid.UUID, vmid int) (*PlacementView, error) {
 	db, err := s.db(ctx, orgID)
 	if err != nil {
 		return nil, err
@@ -380,7 +408,40 @@ func (s *FleetService) BackfillVMID(ctx context.Context, orgID, placementID uuid
 	if err := db.WithContext(ctx).Model(&pl).Update("vmid", &vmid).Error; err != nil {
 		return nil, fmt.Errorf("update vmid: %w", err)
 	}
-	return &pl, nil
+	return placementByID(ctx, db, placementID)
+}
+
+// placementByID fetches a single placement row joined with its hypervisor name.
+func placementByID(ctx context.Context, db *gorm.DB, placementID uuid.UUID) (*PlacementView, error) {
+	type row struct {
+		ID             uuid.UUID
+		PoolID         uuid.UUID
+		HypervisorID   uuid.UUID
+		HypervisorName string
+		VMID           *int
+		CreatedAt      time.Time
+	}
+	var r row
+	if err := db.WithContext(ctx).
+		Table("placements").
+		Select("placements.id, placements.pool_id, placements.hypervisor_id, "+
+			"hypervisors.name AS hypervisor_name, placements.vmid, placements.created_at").
+		Joins("JOIN hypervisors ON hypervisors.id = placements.hypervisor_id").
+		Where("placements.id = ?", placementID).
+		First(&r).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get placement: %w", err)
+	}
+	return &PlacementView{
+		ID:             r.ID,
+		PoolID:         r.PoolID,
+		HypervisorID:   r.HypervisorID,
+		HypervisorName: r.HypervisorName,
+		VMID:           r.VMID,
+		CreatedAt:      r.CreatedAt,
+	}, nil
 }
 
 func createPlacements(tx *gorm.DB, poolID uuid.UUID, hvIDs []uuid.UUID) error {
@@ -475,6 +536,7 @@ func placementsForPool(ctx context.Context, db *gorm.DB, poolID uuid.UUID) ([]Pl
 	for _, r := range rows {
 		out = append(out, PlacementView{
 			ID:             r.ID,
+			PoolID:         poolID,
 			HypervisorID:   r.HypervisorID,
 			HypervisorName: r.HypervisorName,
 			VMID:           r.VMID,

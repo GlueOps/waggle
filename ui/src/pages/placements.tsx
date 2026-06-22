@@ -1,6 +1,13 @@
-import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { listPlacementsOptions } from "@/sdk/@tanstack/react-query.gen"
+import {
+  listPlacementsOptions,
+  listPlacementsQueryKey,
+  backfillPlacementVmidMutation,
+  deletePlacementMutation,
+} from "@/sdk/@tanstack/react-query.gen"
+import type { FleetPlacementView } from "@/sdk/types.gen"
 import {
   Table,
   TableBody,
@@ -11,10 +18,61 @@ import {
 } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageShell } from "@/components/crud/page-shell"
+import { RowActions } from "@/components/crud/row-actions"
+import { FormDialog } from "@/components/crud/form-dialog"
+import { CopyId } from "@/components/ui/copy-id"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { errMsg } from "@/lib/errors"
 
 export function PlacementsPage() {
+  const qc = useQueryClient()
   const list = useQuery(listPlacementsOptions())
   const items = list.data?.items ?? []
+
+  const [backfilling, setBackfilling] = useState<FleetPlacementView | null>(null)
+  const [vmidInput, setVmidInput] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: listPlacementsQueryKey() })
+  const backfillMut = useMutation(backfillPlacementVmidMutation())
+  const deleteMut = useMutation(deletePlacementMutation())
+
+  async function submitBackfill() {
+    if (!backfilling) return
+    const vmid = parseInt(vmidInput, 10)
+    if (!vmid || vmid < 1) {
+      setError("vmid must be a positive integer")
+      return
+    }
+    setError(null)
+    try {
+      await backfillMut.mutateAsync({ body: { vmid }, path: { id: backfilling.id } })
+      await invalidate()
+      setBackfilling(null)
+      setVmidInput("")
+    } catch (e) {
+      setError(errMsg(e))
+    }
+  }
+
+  async function remove(p: FleetPlacementView) {
+    if (!confirm(`Delete placement ${p.id.slice(0, 8)}… on ${p.hypervisor_name}? The pool's desired count is NOT adjusted.`)) return
+    try {
+      await deleteMut.mutateAsync({ path: { id: p.id } })
+      await invalidate()
+    } catch (e) {
+      setNotice(errMsg(e))
+    }
+  }
+
+  function openBackfill(p: FleetPlacementView) {
+    setVmidInput(p.vmid?.toString() ?? "")
+    setError(null)
+    setBackfilling(p)
+  }
 
   // Per-hypervisor rollup of committed placement resources.
   const byHv = new Map<string, { count: number; vcpu: number; ram: number; disk: number }>()
@@ -33,6 +91,8 @@ export function PlacementsPage() {
       title="Placements"
       description="Every VM the oracle has placed across the fleet, and what each hypervisor is carrying."
       query={list}
+      notice={notice}
+      onDismissNotice={() => setNotice(null)}
       empty={items.length === 0}
       emptyText="No placements yet. Create a pool to place VMs."
     >
@@ -72,29 +132,76 @@ export function PlacementsPage() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>ID</TableHead>
             <TableHead>Pool</TableHead>
             <TableHead>Hypervisor</TableHead>
             <TableHead>Slot</TableHead>
             <TableHead>VMID</TableHead>
             <TableHead>Placed</TableHead>
+            <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {items.map((p) => (
             <TableRow key={p.id}>
+              <TableCell>
+                <CopyId id={p.id} />
+              </TableCell>
               <TableCell className="font-medium">{p.pool_name}</TableCell>
               <TableCell>{p.hypervisor_name}</TableCell>
               <TableCell className="text-muted-foreground">
                 {p.slot_name} ({p.vcpu}c/{p.ram_gb}G/{p.disk_gb}G)
               </TableCell>
-              <TableCell className="tabular-nums">{p.vmid ?? "—"}</TableCell>
+              <TableCell className="tabular-nums">
+                {p.vmid != null ? (
+                  <Badge variant="secondary">{p.vmid}</Badge>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
               <TableCell className="text-muted-foreground">
                 {new Date(p.created_at).toLocaleString()}
+              </TableCell>
+              <TableCell>
+                <RowActions
+                  actions={[
+                    { label: "Backfill VMID", onSelect: () => openBackfill(p) },
+                    { label: "Delete", variant: "destructive", onSelect: () => void remove(p) },
+                  ]}
+                />
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      <FormDialog
+        open={backfilling !== null}
+        onOpenChange={(o) => !o && setBackfilling(null)}
+        title="Backfill VMID"
+        description={
+          backfilling
+            ? `Set the Proxmox vmid for placement ${backfilling.id.slice(0, 8)}… on ${backfilling.hypervisor_name}.`
+            : ""
+        }
+        onSubmit={() => void submitBackfill()}
+        submitting={backfillMut.isPending}
+        error={error}
+        submitLabel="Save"
+      >
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="vmid-input">Proxmox VMID</Label>
+          <Input
+            id="vmid-input"
+            type="number"
+            min={1}
+            placeholder="e.g. 100"
+            value={vmidInput}
+            onChange={(e) => setVmidInput(e.target.value)}
+            required
+          />
+        </div>
+      </FormDialog>
     </PageShell>
   )
 }

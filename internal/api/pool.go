@@ -45,6 +45,7 @@ func toPoolView(p *tenant.Pool) poolView {
 
 type placementView struct {
 	ID             uuid.UUID `json:"id"`
+	PoolID         uuid.UUID `json:"pool_id"`
 	HypervisorID   uuid.UUID `json:"hypervisor_id"`
 	HypervisorName string    `json:"hypervisor_name"`
 	VMID           *int      `json:"vmid,omitempty"`
@@ -54,6 +55,7 @@ type placementView struct {
 func toPlacementView(p service.PlacementView) placementView {
 	return placementView{
 		ID:             p.ID,
+		PoolID:         p.PoolID,
 		HypervisorID:   p.HypervisorID,
 		HypervisorName: p.HypervisorName,
 		VMID:           p.VMID,
@@ -132,6 +134,10 @@ type fleetPlacementListOutput struct {
 	}
 }
 
+type placementIDInput struct {
+	ID uuid.UUID `path:"id"`
+}
+
 type backfillVMIDInput struct {
 	ID   uuid.UUID `path:"id"`
 	Body struct {
@@ -163,12 +169,13 @@ func (s *Server) registerPool(fleet *service.FleetService, tokens *service.Token
 	// The pool tag matches its URL collection segment ("/pools"), so generators
 	// bind it to a full CRUD resource.
 	pools := tagged("pools")
-	// Placements are NOT a standalone managed resource: they have no create or
-	// read-by-id and are produced by pool create/resize. The tag is left as the
-	// singular "placement" so it deliberately does NOT match "/placements" —
-	// otherwise the generator emits a broken partial-CRUD resource (an Update
-	// against an empty model: `var result client.` with no type).
-	placements := tagged("placement")
+	// Placements are a managed resource with get/update(backfill-vmid)/delete by
+	// ID plus a tenant-wide list. The "placements" tag matches the URL collection
+	// so the OpenAPI Generator emits a full resource (read/update/delete) and a
+	// list data source. Create is not supported (placements are produced by pool
+	// create/resize); the generated create stub is overwritten by the hand-authored
+	// placement_resource overlay injected during `waggle generate terraform`.
+	placements := tagged("placements")
 
 	huma.Register(s.API, pools(huma.Operation{
 		OperationID:   "create-pool",
@@ -321,6 +328,23 @@ func (s *Server) registerPool(fleet *service.FleetService, tokens *service.Token
 	})
 
 	huma.Register(s.API, placements(huma.Operation{
+		OperationID: "get-placement",
+		Method:      http.MethodGet,
+		Path:        "/placements/{id}",
+		Summary:     "Fetch a single placement with its pool, hypervisor, and vmid.",
+	}), func(ctx context.Context, in *placementIDInput) (*placementOutput, error) {
+		orgID, err := orgFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		pl, err := fleet.GetPlacement(ctx, orgID, in.ID)
+		if err != nil {
+			return nil, mapPoolError(err)
+		}
+		return &placementOutput{Body: toPlacementView(*pl)}, nil
+	})
+
+	huma.Register(s.API, placements(huma.Operation{
 		OperationID: "backfill-placement-vmid",
 		Method:      http.MethodPatch,
 		Path:        "/placements/{id}",
@@ -334,12 +358,24 @@ func (s *Server) registerPool(fleet *service.FleetService, tokens *service.Token
 		if err != nil {
 			return nil, mapPoolError(err)
 		}
-		return &placementOutput{Body: placementView{
-			ID:           pl.ID,
-			HypervisorID: pl.HypervisorID,
-			VMID:         pl.VMID,
-			CreatedAt:    pl.CreatedAt,
-		}}, nil
+		return &placementOutput{Body: toPlacementView(*pl)}, nil
+	})
+
+	huma.Register(s.API, placements(huma.Operation{
+		OperationID:   "delete-placement",
+		Method:        http.MethodDelete,
+		Path:          "/placements/{id}",
+		Summary:       "Remove a placement. The pool's desired_count is not adjusted; resize the pool to re-fill the vacancy.",
+		DefaultStatus: http.StatusNoContent,
+	}), func(ctx context.Context, in *placementIDInput) (*struct{}, error) {
+		orgID, err := orgFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := fleet.DeletePlacement(ctx, orgID, in.ID); err != nil {
+			return nil, mapPoolError(err)
+		}
+		return nil, nil
 	})
 }
 
