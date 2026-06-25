@@ -44,9 +44,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
     go build -trimpath \
       -ldflags "-s -w \
-        -X github.com/glueops/waggle/cmd.version=${VERSION} \
-        -X github.com/glueops/waggle/cmd.commit=${COMMIT} \
-        -X github.com/glueops/waggle/cmd.date=${DATE}" \
+        -X github.com/glueops/waggle/internal/buildinfo.Version=${VERSION} \
+        -X github.com/glueops/waggle/internal/buildinfo.Commit=${COMMIT} \
+        -X github.com/glueops/waggle/internal/buildinfo.Date=${DATE}" \
       -o /out/waggle .
 
 

@@ -8,6 +8,7 @@ import {
   MapPin,
   Building2,
 } from "lucide-react"
+import { useEffect, useState } from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -39,6 +40,15 @@ export function Sidebar({
   active: NavKey
   onNavigate: (key: NavKey) => void
 }) {
+  const [version, setVersion] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch("/api/v1/version")
+      .then((r) => r.json())
+      .then((d) => setVersion(d.version ?? null))
+      .catch(() => {})
+  }, [])
+
   return (
     <aside className="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 flex-col border-r md:flex">
       <div className="flex h-14 items-center gap-2 px-5">
@@ -66,7 +76,8 @@ export function Sidebar({
         ))}
       </nav>
       <div className="text-sidebar-foreground/50 px-5 py-4 text-xs">
-        Placement oracle &amp; ledger
+        <div>Placement oracle &amp; ledger</div>
+        {version && <div className="mt-0.5 font-mono">{version}</div>}
       </div>
     </aside>
   )
