@@ -16,7 +16,7 @@ services:
     restart: always
 
   mailpit:
-    image: axllent/mailpit@sha256:030f06031ce5c60913ac9363da1ab0d4be6fd2a78147dd0e1ca0fcac665d6b34
+    image: axllent/mailpit@sha256:37a38e48e9338cd7e89dfeb487f37b02ebfcd9cb23111bed2d345e79d37d6dd6
     restart: always
     ports:
       - "1025:1025"
