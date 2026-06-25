@@ -110,6 +110,10 @@ func (r *PlacementsResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
+	// Capture the desired vmid before fromAPI overwrites it with the current
+	// API state (which has vmid=null until we PATCH it).
+	desiredVmid := plan.Vmid
+
 	pl, err := r.readPlacement(ctx, plan.PlacementID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Placement not found", err.Error())
@@ -118,8 +122,8 @@ func (r *PlacementsResource) Create(ctx context.Context, req resource.CreateRequ
 
 	fromAPI(pl, &plan)
 
-	if !plan.Vmid.IsNull() && !plan.Vmid.IsUnknown() {
-		patched, err := r.patchVmid(ctx, plan.PlacementID.ValueString(), plan.Vmid.ValueInt64())
+	if !desiredVmid.IsNull() && !desiredVmid.IsUnknown() {
+		patched, err := r.patchVmid(ctx, plan.PlacementID.ValueString(), desiredVmid.ValueInt64())
 		if err != nil {
 			resp.Diagnostics.AddError("Error backfilling vmid", err.Error())
 			return

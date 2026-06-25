@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/glueops/waggle/internal/app"
+	"github.com/glueops/waggle/internal/buildinfo"
 	"github.com/glueops/waggle/internal/config"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -74,6 +75,7 @@ func Build(cfg config.Config, deps *app.Deps) (*Server, error) {
 	}
 
 	s.registerHealth()
+	s.registerVersion()
 	if deps.Auth != nil && deps.Tokens != nil {
 		s.registerAuth(deps.Auth, deps.Tokens)
 	}
@@ -128,6 +130,30 @@ func (s *Server) registerHealth() {
 	}, func(_ context.Context, _ *struct{}) (*healthOutput, error) {
 		out := &healthOutput{}
 		out.Body.Status = "ok"
+		return out, nil
+	})
+}
+
+type versionOutput struct {
+	Body struct {
+		Version string `json:"version" example:"v0.1.15"`
+		Commit  string `json:"commit" example:"abc1234"`
+		Date    string `json:"date" example:"2026-06-25T01:17:56Z"`
+	}
+}
+
+func (s *Server) registerVersion() {
+	huma.Register(s.API, huma.Operation{
+		OperationID: "version",
+		Method:      http.MethodGet,
+		Path:        "/version",
+		Summary:     "Server version",
+		Tags:        []string{"system"},
+	}, func(_ context.Context, _ *struct{}) (*versionOutput, error) {
+		out := &versionOutput{}
+		out.Body.Version = buildinfo.Version
+		out.Body.Commit = buildinfo.Commit
+		out.Body.Date = buildinfo.Date
 		return out, nil
 	})
 }
