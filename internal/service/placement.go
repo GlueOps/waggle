@@ -421,19 +421,20 @@ func placementByID(ctx context.Context, db *gorm.DB, placementID uuid.UUID) (*Pl
 		VMID           *int      `gorm:"column:vmid"`
 		CreatedAt      time.Time `gorm:"column:created_at"`
 	}
-	var r row
+	var rows []row
 	if err := db.WithContext(ctx).
 		Table("placements").
 		Select("placements.id, placements.pool_id, placements.hypervisor_id, "+
 			"hypervisors.name AS hypervisor_name, placements.vmid, placements.created_at").
 		Joins("JOIN hypervisors ON hypervisors.id = placements.hypervisor_id").
 		Where("placements.id = ?", placementID).
-		First(&r).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
+		Scan(&rows).Error; err != nil {
 		return nil, fmt.Errorf("get placement: %w", err)
 	}
+	if len(rows) == 0 {
+		return nil, ErrNotFound
+	}
+	r := rows[0]
 	return &PlacementView{
 		ID:             r.ID,
 		PoolID:         r.PoolID,

@@ -178,20 +178,11 @@ func (r *PlacementsResource) Update(ctx context.Context, req resource.UpdateRequ
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-// Delete removes the placement from waggle. The pool's desired_count is not
-// adjusted; resize the pool separately to re-fill the vacancy.
-func (r *PlacementsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state placementResourceModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	_, err := r.client.DoRequest(ctx, http.MethodDelete,
-		fmt.Sprintf("/placements/%s", state.PlacementID.ValueString()), nil)
-	if err != nil && !isNotFound(err) {
-		resp.Diagnostics.AddError("Error deleting placement", err.Error())
-	}
+// Delete releases Terraform's adoption of this placement. The waggle placement
+// record itself is NOT deleted — placement lifecycle is governed by the pool's
+// desired_count. Removing this resource from state simply stops Terraform from
+// managing the vmid backfill; the placement continues to exist in waggle.
+func (r *PlacementsResource) Delete(_ context.Context, _ resource.DeleteRequest, _ *resource.DeleteResponse) {
 }
 
 func (r *PlacementsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
