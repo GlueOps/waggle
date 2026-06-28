@@ -56,6 +56,7 @@ internal/client/model_switch_org_input_body.go
 internal/client/model_update_member_input_body.go
 internal/client/model_update_org_input_body.go
 internal/client/model_verify_email_input_body.go
+internal/client/model_version_output_body.go
 internal/provider/api_keys_data_source.go
 internal/provider/api_keys_model.go
 internal/provider/api_keys_resource.go
