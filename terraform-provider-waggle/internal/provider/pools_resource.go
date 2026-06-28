@@ -149,10 +149,11 @@ func (r *PoolsResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	reqBody := plan.ToClientModel()
+	// Resize endpoint only accepts desired_count — not the full pool body.
+	resizeBody := map[string]int64{"desired_count": plan.DesiredCount.ValueInt64()}
 
 	// Use state.Id (known current value) not plan.Id (unknown during update).
-	respBody, err := r.client.DoRequest(ctx, "PATCH", fmt.Sprintf("/pools/%v", state.Id.ValueString()), reqBody)
+	respBody, err := r.client.DoRequest(ctx, "PATCH", fmt.Sprintf("/pools/%v", state.Id.ValueString()), resizeBody)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating pools", err.Error())
 		return
