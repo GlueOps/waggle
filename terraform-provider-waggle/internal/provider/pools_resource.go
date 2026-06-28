@@ -141,15 +141,18 @@ func (r *PoolsResource) Read(ctx context.Context, req resource.ReadRequest, resp
 
 func (r *PoolsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan PoolsModel
+	var state PoolsModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	reqBody := plan.ToClientModel()
 
-	respBody, err := r.client.DoRequest(ctx, "PATCH", fmt.Sprintf("/pools/%v", plan.Id.ValueString()), reqBody)
+	// Use state.Id (known current value) not plan.Id (unknown during update).
+	respBody, err := r.client.DoRequest(ctx, "PATCH", fmt.Sprintf("/pools/%v", state.Id.ValueString()), reqBody)
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating pools", err.Error())
 		return

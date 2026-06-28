@@ -456,6 +456,13 @@ var generateTerraformOAGCmd = &cobra.Command{
 			return err
 		}
 
+		// Fix the generated pool Update to use state.Id instead of plan.Id for
+		// the PATCH URL. plan.Id is "(known after apply)" during an update, which
+		// produces an empty path (/pools/) and an HTML error response.
+		if err := patchPoolsResourceUpdate(outDir); err != nil {
+			return err
+		}
+
 		// Correct resource attribute roles: the generator marks every field
 		// Required, forcing server-assigned fields (id, created_at, ...) into
 		// config and causing perpetual diffs. Reclassify per the spec.
@@ -1009,4 +1016,54 @@ func init() {
 	generateCmd.AddCommand(generateSdkCmd)
 	generateCmd.AddCommand(generateTerraformCmd)
 	rootCmd.AddCommand(generateCmd)
+}
+
+// patchPoolsResourceUpdate fixes the generated pools Update to use state.Id
+// for the PATCH URL instead of plan.Id, which is "(known after apply)" during
+// an update and produces an empty path (/pools/) that returns an HTML error.
+func patchPoolsResourceUpdate(outDir string) error {
+	file := filepath.Join(outDir, "internal", "provider", "pools_resource.go")
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", file, err)
+	}
+	content := string(b)
+
+	const old = `func (r *PoolsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan PoolsModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	reqBody := plan.ToClientModel()
+
+	respBody, err := r.client.DoRequest(ctx, "PATCH", fmt.Sprintf("/pools/%v", plan.Id.ValueString()), reqBody)`
+
+	const patched = `func (r *PoolsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan PoolsModel
+	var state PoolsModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	reqBody := plan.ToClientModel()
+
+	// Use state.Id (known current value) not plan.Id (unknown during update).
+	respBody, err := r.client.DoRequest(ctx, "PATCH", fmt.Sprintf("/pools/%v", state.Id.ValueString()), reqBody)`
+
+	if !strings.Contains(content, old) {
+		log.Printf("note: pools_resource.go Update already patched or generator output changed; skipping")
+		return nil
+	}
+	patched2 := strings.Replace(content, old, patched, 1)
+	if err := os.WriteFile(file, []byte(patched2), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", file, err)
+	}
+	log.Printf("patched pools_resource.go: Update uses state.Id for PATCH URL")
+	return nil
 }
