@@ -206,6 +206,57 @@ JWT_REFRESH_TTL_HOUR=720
 JWT_AUDIENCE=waggle-api
 ```
 
+### Database Roles & Permissions
+
+Waggle uses up to two PostgreSQL roles:
+
+- **App role** — the credentials in `DATABASE_URL`. Runs migrations, serves the
+  API/worker, and **owns** the tenant databases and the objects in them.
+- **Admin role** — the credentials in `ADMIN_DATABASE_URL`. Creates and drops the
+  per-tenant databases (`tenant_<org-id>`). If unset, Waggle derives it from
+  `DATABASE_URL` against the `postgres` maintenance DB — i.e. the **app role**
+  does it, and then the app role itself needs `CREATEDB`.
+
+> **The PostgreSQL 15+ gotcha:** `GRANT ALL PRIVILEGES ON DATABASE` does **not**
+> grant privileges on the `public` schema, and PG15+ no longer gives non-owners
+> `CREATE` on `public`. So the app role must **own** each database — owning a DB
+> makes it an implicit member of `pg_database_owner`, which owns `public`.
+> Otherwise migrations fail with `permission denied for schema public`.
+
+Run the following as a superuser (or your managed provider's master user):
+
+```sql
+-- 1) App role + control database, owned by the app role.
+CREATE ROLE waggle LOGIN PASSWORD 'changeme';
+CREATE DATABASE waggle OWNER waggle;
+
+-- 2) Allow the app role to create tenant databases.
+--    Skip this if ADMIN_DATABASE_URL points at a separate privileged role.
+ALTER ROLE waggle CREATEDB;
+```
+
+When the **admin** role differs from the app role (recommended — see managed
+Postgres below), the provisioner sets each new tenant DB's owner to the app
+role, so the admin role must be able to `SET ROLE` to it:
+
+```sql
+GRANT waggle TO <admin_role>;   -- admin_role must be a member of the app role
+```
+
+**Managed Postgres (AWS RDS, Cloud SQL, …):** there is usually no superuser you
+can use, but the provider's **master user** has the needed privileges. Keep the
+least-privileged app role in `DATABASE_URL`, point `ADMIN_DATABASE_URL` at the
+master user, and run the `GRANT waggle TO <master>` above so ownership transfer
+works:
+
+```bash
+DATABASE_URL=postgres://waggle:...@host:5432/waggle?sslmode=require
+ADMIN_DATABASE_URL=postgres://master:...@host:5432/postgres?sslmode=require
+```
+
+`waggle migrate up` runs a preflight check and prints exact remediation SQL if
+the role still can't create in `public`.
+
 ### Generate Master Key
 
 ```bash
