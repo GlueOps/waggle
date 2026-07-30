@@ -55,7 +55,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # (and run worker/encrypt/etc.) interactively. ca-certificates is required for
 # outbound TLS (Proxmox, SMTP); the binary is static (CGO disabled) so it runs
 # fine on musl.
-FROM alpine:3.21 AS runtime
+FROM alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce AS runtime
 
 # postgresql-client provides `psql`, which the `waggle psql` subcommand execs.
 RUN apk add --no-cache ca-certificates tzdata postgresql-client \
