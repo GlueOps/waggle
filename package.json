@@ -2,7 +2,7 @@
   "private": true,
   "license": "UNLICENSED",
   "devDependencies": {
-    "@hey-api/openapi-ts": "0.97.3",
+    "@hey-api/openapi-ts": "0.99.0",
     "typescript": "6.0.3"
   }
 }
