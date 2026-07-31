@@ -4,5 +4,8 @@
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
     "typescript": "6.0.3"
+  },
+  "resolutions": {
+    "js-yaml": "4.3.0"
   }
 }
