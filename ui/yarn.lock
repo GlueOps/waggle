@@ -213,7 +213,7 @@
   dependencies:
     "@types/json-schema" "^7.0.15"
 
-"@eslint/js@^10.0.1":
+"@eslint/js@10.0.1":
   version "10.0.1"
   resolved "https://registry.yarnpkg.com/@eslint/js/-/js-10.0.1.tgz#1e8a876f50117af8ab67e47d5ad94d38d6622583"
   integrity sha512-zeR9k5pd4gxjZ0abRoIaxdc7I3nDktoXZk2qOv9gCNWx3mVwEn32VRhyLaRsDiJjTs0xq/T8mfPtyuXu7GWBcA==
@@ -1181,7 +1181,7 @@
     "@tailwindcss/oxide-win32-arm64-msvc" "4.3.3"
     "@tailwindcss/oxide-win32-x64-msvc" "4.3.3"
 
-"@tailwindcss/vite@^4.3.1":
+"@tailwindcss/vite@4.3.3":
   version "4.3.3"
   resolved "https://registry.yarnpkg.com/@tailwindcss/vite/-/vite-4.3.3.tgz#1f4037badcb5e6c6bb574d3d8a0172c83f26b97f"
   integrity sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw==
@@ -1224,7 +1224,7 @@
   resolved "https://registry.yarnpkg.com/@types/json-schema/-/json-schema-7.0.15.tgz#596a1747233694d50f6ad8a7869fcb6f56cf5841"
   integrity sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==
 
-"@types/node@^26.0.1":
+"@types/node@26.1.1":
   version "26.1.1"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-26.1.1.tgz#bad758d601e97d6cf457d204ee76a35fce7bd119"
   integrity sha512-nxAkRSVkN1Y0JC1W8ky/fTfkGsMmcrRsbx+3XoZE+rMOX71kLYTV7fLXpqud1GpbpP5TuffXFqfX7fH2GgZREw==
@@ -1339,7 +1339,7 @@
     "@typescript-eslint/types" "8.64.0"
     eslint-visitor-keys "^5.0.0"
 
-"@vitejs/plugin-react@^6.0.3":
+"@vitejs/plugin-react@6.0.3":
   version "6.0.3"
   resolved "https://registry.yarnpkg.com/@vitejs/plugin-react/-/plugin-react-6.0.3.tgz#55f1d7f558534d10aef03c007dc208b7c3771ce4"
   integrity sha512-vmFvco5/QuC2f9Oj+wTk0+9XeDFkHxSamwZKYc7MxYwKICfvUvlMhqKI0VuICPltGqh1neqBKDvO4kes1ya8vg==
@@ -1482,7 +1482,7 @@ escape-string-regexp@^4.0.0:
   resolved "https://registry.yarnpkg.com/escape-string-regexp/-/escape-string-regexp-4.0.0.tgz#14ba83a5d373e3d311e5afca29cf5bfad965bf34"
   integrity sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==
 
-eslint-plugin-react-hooks@^7.1.1:
+eslint-plugin-react-hooks@7.1.1:
   version "7.1.1"
   resolved "https://registry.yarnpkg.com/eslint-plugin-react-hooks/-/eslint-plugin-react-hooks-7.1.1.tgz#e6742cad75d970c0a3f30d7d3fa80a4784f55927"
   integrity sha512-f2I7Gw6JbvCexzIInuSbZpfdQ44D7iqdWX01FKLvrPgqxoE7oMj8clOfto8U6vYiz4yd5oKu39rRSVOe1zRu0g==
@@ -1493,7 +1493,7 @@ eslint-plugin-react-hooks@^7.1.1:
     zod "^3.25.0 || ^4.0.0"
     zod-validation-error "^3.5.0 || ^4.0.0"
 
-eslint-plugin-react-refresh@^0.5.3:
+eslint-plugin-react-refresh@0.5.3:
   version "0.5.3"
   resolved "https://registry.yarnpkg.com/eslint-plugin-react-refresh/-/eslint-plugin-react-refresh-0.5.3.tgz#0311218631193fc1ea1c37531a1e7085a813bb60"
   integrity sha512-5EMmLCV98Pi4o/f/3DP/v/tNqLHMIc9I8LKClNDWhZ9JTho89/kQcitCXQBMG7sAfVRK0Ie3T2EDOzp1YXYiVA==
@@ -1518,7 +1518,7 @@ eslint-visitor-keys@^5.0.0, eslint-visitor-keys@^5.0.1:
   resolved "https://registry.yarnpkg.com/eslint-visitor-keys/-/eslint-visitor-keys-5.0.1.tgz#9e3c9489697824d2d4ce3a8ad12628f91e9f59be"
   integrity sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA==
 
-eslint@^10.6.0:
+eslint@10.7.0:
   version "10.7.0"
   resolved "https://registry.yarnpkg.com/eslint/-/eslint-10.7.0.tgz#cd3b8022f3b1e3b183760d90dfc58e9d3644106b"
   integrity sha512-GVTD7s1vdIl6UYvAfriOPeY1Df8LIZjfofLvHwde+erDHGGuHyuM6xoxRxmHiebhYuD2p1vN4wWh0XzPARSGDQ==
@@ -1657,7 +1657,7 @@ glob-parent@^6.0.2:
   dependencies:
     is-glob "^4.0.3"
 
-globals@^17.7.0:
+globals@17.7.0:
   version "17.7.0"
   resolved "https://registry.yarnpkg.com/globals/-/globals-17.7.0.tgz#553d55090b4dde8209ec2da42580d6e7e7d8b10d"
   integrity sha512-Czmyns5dUsq4seFBR/Kdydhmo8y9kC79hiSkPn0YcGtNnYWnrgt0vjrSjx9tspoDGWm2CMarffRuLjM4xUz8xg==
@@ -2188,7 +2188,7 @@ tailwind-merge@^3.6.0:
   resolved "https://registry.yarnpkg.com/tailwind-merge/-/tailwind-merge-3.6.0.tgz#88d83242d1dd7bc847223f73dcf210dd1f2ee11c"
   integrity sha512-uxL7qAVQriqRQPAyK3pj66VqskWqoZ37PW94jwOTwNfq/z9oyu1V+eqrZqtR2+fCiXdYOZe/Modt8GtvqNzu+w==
 
-tailwindcss@4.3.3, tailwindcss@^4.3.1:
+tailwindcss@4.3.3:
   version "4.3.3"
   resolved "https://registry.yarnpkg.com/tailwindcss/-/tailwindcss-4.3.3.tgz#c006861611c213c1877893ab5b23daa16be2bb55"
   integrity sha512-gOhV3P7ufE62QDGg1zVaTgCR+EtPv92k2nIhVcVKcLmxT1sUBsQGhnZj175j+MqRt4zLF7ic+sCYjfhxMxj7YQ==
@@ -2216,7 +2216,7 @@ tslib@^2.0.0, tslib@^2.1.0, tslib@^2.4.0, tslib@^2.8.1:
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.8.1.tgz#612efe4ed235d567e8aba5f2a5fab70280ade83f"
   integrity sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==
 
-tw-animate-css@^1.4.0:
+tw-animate-css@1.4.0:
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/tw-animate-css/-/tw-animate-css-1.4.0.tgz#b4a06f68244cba39428aa47e65e6e4c0babc21ee"
   integrity sha512-7bziOlRqH0hJx80h/3mbicLW7o8qLsH5+RaLR2t+OHM3D0JlWGODQKQ4cxbK7WlvmUxpcj6Kgu6EKqjrGFe3QQ==
@@ -2228,7 +2228,7 @@ type-check@^0.4.0, type-check@~0.4.0:
   dependencies:
     prelude-ls "^1.2.1"
 
-typescript-eslint@^8.62.0:
+typescript-eslint@8.64.0:
   version "8.64.0"
   resolved "https://registry.yarnpkg.com/typescript-eslint/-/typescript-eslint-8.64.0.tgz#4984dae4de9dc8bf892acf5c394d0a2a5f08c3e1"
   integrity sha512-0qg+pDNMnqYzqH9AnNK+39tejHvsShUOUUoRUgtnTGE7QuMZhiFDnozq8nHJVq+Wae6NMLKNWLg5WmkcC/ndyQ==
@@ -2238,7 +2238,7 @@ typescript-eslint@^8.62.0:
     "@typescript-eslint/typescript-estree" "8.64.0"
     "@typescript-eslint/utils" "8.64.0"
 
-typescript@~6.0.3:
+typescript@6.0.3:
   version "6.0.3"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-6.0.3.tgz#90251dc007916e972786cb94d74d15b185577d21"
   integrity sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==
@@ -2278,7 +2278,7 @@ use-sidecar@^1.1.3:
     detect-node-es "^1.1.0"
     tslib "^2.0.0"
 
-vite@^8.1.0:
+vite@8.1.5:
   version "8.1.5"
   resolved "https://registry.yarnpkg.com/vite/-/vite-8.1.5.tgz#ccffce3ee487b1886223b24ebb27b91674827d30"
   integrity sha512-7ULLwsCdYx/nRyrpiEwvqb5TFHrMVZyBt+rg/OAXT7rgj/z+DtTDyKFeLAdDkubDVDKD8jOsndmy7m55XcfUsw==
