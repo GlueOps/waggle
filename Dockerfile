@@ -1,8 +1,8 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
 
 # ---- Stage 1: build the frontend ----------------------------------------
 # Produces ui/dist, which is embedded into the Go binary via go:embed.
-FROM node:24-bookworm-slim AS ui
+FROM node:24-bookworm-slim@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7 AS ui
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /ui
 
@@ -19,7 +19,7 @@ RUN yarn build
 # ---- Stage 2: build the Go binary ---------------------------------------
 # CGO is disabled so the result is a fully static binary for a scratch/distroless
 # runtime. Version metadata is injected via -ldflags.
-FROM golang:1.26-bookworm AS build
+FROM golang:1.26-bookworm@sha256:1ecb7edf62a0408027bd5729dfd6b1b8766e578e8df93995b225dfd0944eb651 AS build
 WORKDIR /src
 
 # Download modules first for layer caching.
