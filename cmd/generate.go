@@ -131,6 +131,9 @@ var generateSdkCmd = &cobra.Command{
 		}); err != nil {
 			return err
 		}
+		if err := patchTSBuildConfig("sdk/ts"); err != nil {
+			return err
+		}
 
 		log.Println("4. Generating standalone Go SDK (sdk/go)...")
 		if err := generateGo("docs/openapi.json", "sdk/go", specVersion); err != nil {
@@ -241,6 +244,73 @@ func generateTSPackagedOAG(inputSpec, outDir string, extraArgs []string) error {
 	args = append(args, extraArgs...)
 
 	return run(exec.Command("npx", args...), "typescript-fetch -> "+outDir)
+}
+
+// patchTSBuildConfig fixes up the build configuration openapi-generator emits
+// for the typescript-fetch client so it compiles under TypeScript 6.
+//
+// generateTSPackagedOAG wipes outDir on every run, so .openapi-generator-ignore
+// cannot preserve hand edits here — these fixes have to be re-applied after
+// each generation, the same way patchGoClientLogging handles the Go client.
+//
+// Two changes, both to tsconfig.json:
+//   - ignoreDeprecations: TS 6 makes `moduleResolution: node` (node10) a hard
+//     error without this opt-out (TS5107). Keeping node10 leaves the emitted
+//     JavaScript byte-identical for consumers; a real migration to node16 /
+//     bundler resolution will be required before TypeScript 7.
+//   - rootDir: TS 6 requires the common source directory to be explicit
+//     (TS5011). "src" is what TS previously inferred, so output layout is
+//     unchanged.
+//
+// The generated devDependency range ("^4.0 || ^5.0") is also widened to admit
+// TypeScript 6.
+func patchTSBuildConfig(outDir string) error {
+	tsconfigPath := filepath.Join(outDir, "tsconfig.json")
+	b, err := os.ReadFile(tsconfigPath)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", tsconfigPath, err)
+	}
+
+	var tsconfig map[string]any
+	if err := json.Unmarshal(b, &tsconfig); err != nil {
+		return fmt.Errorf("parse %s: %w", tsconfigPath, err)
+	}
+	opts, ok := tsconfig["compilerOptions"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s: compilerOptions is missing or not an object", tsconfigPath)
+	}
+	opts["ignoreDeprecations"] = "6.0"
+	opts["rootDir"] = "src"
+
+	out, err := json.MarshalIndent(tsconfig, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode %s: %w", tsconfigPath, err)
+	}
+	if err := os.WriteFile(tsconfigPath, append(out, '\n'), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", tsconfigPath, err)
+	}
+
+	pkgPath := filepath.Join(outDir, "package.json")
+	pb, err := os.ReadFile(pkgPath)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", pkgPath, err)
+	}
+	var pkg map[string]any
+	if err := json.Unmarshal(pb, &pkg); err != nil {
+		return fmt.Errorf("parse %s: %w", pkgPath, err)
+	}
+	if dev, ok := pkg["devDependencies"].(map[string]any); ok {
+		dev["typescript"] = "^6.0.0"
+	}
+	pout, err := json.MarshalIndent(pkg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode %s: %w", pkgPath, err)
+	}
+	if err := os.WriteFile(pkgPath, append(pout, '\n'), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", pkgPath, err)
+	}
+
+	return nil
 }
 
 func patchGoClientLogging(outDir string) error {

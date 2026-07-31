@@ -8,7 +8,14 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+
+# Ignore the Vite build output, but keep dist/.gitkeep tracked: it is what makes
+# the `//go:embed all:dist` directive in ui/embed.go valid on a fresh clone, so
+# `go build ./...` and `go test ./...` work without running `yarn build` first.
+# (A bare `dist` rule ignores the directory itself, and a negation cannot
+# re-include a file inside an ignored directory — hence `dist/*`.)
+dist/*
+!dist/.gitkeep
 dist-ssr
 *.local
 

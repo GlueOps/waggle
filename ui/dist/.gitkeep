@@ -1,0 +1,2 @@
+Placeholder that keeps `//go:embed all:dist` in ui/embed.go valid.
+Restored automatically by the waggle:keep-embed-placeholder Vite plugin.

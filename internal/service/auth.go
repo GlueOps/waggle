@@ -29,6 +29,22 @@ var (
 
 const minPasswordLen = 8
 
+// maxPasswordLen is bcrypt's hard input limit. Passwords longer than this make
+// utils.HashPassword fail, so they must be rejected as invalid input rather
+// than surfacing as a 500 from the hash call.
+const maxPasswordLen = 72
+
+// validatePassword enforces the length bounds both password entry points share.
+func validatePassword(pw string) error {
+	if len(pw) < minPasswordLen {
+		return fmt.Errorf("%w: password must be at least %d characters", ErrInvalidInput, minPasswordLen)
+	}
+	if len(pw) > maxPasswordLen {
+		return fmt.Errorf("%w: password must be at most %d characters", ErrInvalidInput, maxPasswordLen)
+	}
+	return nil
+}
+
 type AuthService struct {
 	db       *gorm.DB
 	tokens   *TokenService
@@ -115,8 +131,8 @@ func (s *AuthService) Signup(ctx context.Context, in SignupInput) (*AuthResult, 
 	if email == "" || in.OrganizationName == "" {
 		return nil, ErrInvalidInput
 	}
-	if len(in.Password) < minPasswordLen {
-		return nil, ErrInvalidInput
+	if err := validatePassword(in.Password); err != nil {
+		return nil, err
 	}
 	domain, err := utils.ExtractDomain(email)
 	if err != nil {
@@ -560,8 +576,8 @@ func (s *AuthService) AcceptInvite(ctx context.Context, in AcceptInviteInput) (*
 	now := time.Now().UTC()
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if !account.IsActive {
-			if len(in.Password) < minPasswordLen {
-				return ErrInvalidInput
+			if verr := validatePassword(in.Password); verr != nil {
+				return verr
 			}
 			hash, herr := utils.HashPassword(in.Password)
 			if herr != nil {
