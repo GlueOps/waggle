@@ -1,0 +1,143 @@
+name: CI
+
+# Runs the test suite and build checks on every PR and push to main.
+#
+# The Docker Publish workflow only proves the image builds; it does not run a
+# single test. This is the workflow that actually gates correctness.
+#
+# Commit type note: the org-required glueops-basic-pr-checks workflow validates
+# commit messages against fix,docs,style,refactor,test,chore,pref,ci,feat,
+# breaking,major,revert. "build" is NOT allowed, which is why Dependabot PRs
+# titled "build(deps): ..." can never merge here.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref; the full matrix is not cheap.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go (${{ matrix.module.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - name: root
+            dir: .
+          - name: terraform-provider
+            dir: terraform-provider-waggle
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: ${{ matrix.module.dir }}/go.mod
+          cache-dependency-path: ${{ matrix.module.dir }}/go.sum
+
+      # ui/dist/.gitkeep keeps the //go:embed directive in ui/embed.go valid, so
+      # the Go build and tests work without building the frontend first.
+      - name: Verify go.mod is tidy
+        working-directory: ${{ matrix.module.dir }}
+        run: |
+          cp go.mod go.mod.orig
+          cp go.sum go.sum.orig
+          go mod tidy
+          if ! diff -q go.mod go.mod.orig >/dev/null || ! diff -q go.sum go.sum.orig >/dev/null; then
+            echo "::error::go.mod/go.sum are not tidy in ${{ matrix.module.dir }}. Run 'go mod tidy' and commit the result."
+            diff -u go.mod.orig go.mod || true
+            diff -u go.sum.orig go.sum || true
+            exit 1
+          fi
+          rm -f go.mod.orig go.sum.orig
+
+      - name: Build
+        working-directory: ${{ matrix.module.dir }}
+        run: go build ./...
+
+      - name: Vet
+        working-directory: ${{ matrix.module.dir }}
+        run: go vet ./...
+
+      - name: Test (race detector, coverage)
+        working-directory: ${{ matrix.module.dir }}
+        run: go test -race -shuffle=on -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Coverage summary
+        working-directory: ${{ matrix.module.dir }}
+        run: |
+          echo "### Go coverage — ${{ matrix.module.name }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage.out | tail -30 >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  ui:
+    name: UI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: yarn
+          cache-dependency-path: ui/yarn.lock
+
+      # --frozen-lockfile matches the Dockerfile: it fails if yarn.lock is out
+      # of sync with package.json, which is exactly the drift that broke every
+      # build on main between 3fb8102 and #26.
+      - name: Install
+        working-directory: ui
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+          yarn install --frozen-lockfile
+
+      - name: Lint
+        working-directory: ui
+        run: yarn lint
+
+      # `yarn build` runs `tsc -b && vite build`, so this type-checks too.
+      - name: Build
+        working-directory: ui
+        run: yarn build
+
+  sdk-ts:
+    name: TypeScript SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+
+      # sdk/ts has no lockfile (it is generated output), so install the declared
+      # devDependency range directly. This job exists because nothing else
+      # compiles sdk/ts — a TypeScript regression here is invisible otherwise,
+      # and it ships to consumers via the "prepare" script on install.
+      - name: Install TypeScript
+        working-directory: sdk/ts
+        run: npm install --no-save typescript@"$(node -p 'require("./package.json").devDependencies.typescript')"
+
+      - name: Build (CJS + ESM)
+        working-directory: sdk/ts
+        run: npm run build
+
+      - name: Verify build output
+        working-directory: sdk/ts
+        run: |
+          for f in dist/index.js dist/index.d.ts dist/esm/index.js; do
+            if [ ! -f "$f" ]; then
+              echo "::error::expected build artifact $f is missing"
+              exit 1
+            fi
+          done

@@ -34,7 +34,7 @@ type authTokens struct {
 type signupInput struct {
 	Body struct {
 		Email            string `json:"email" format:"email" required:"true" maxLength:"255"`
-		Password         string `json:"password" required:"true" minLength:"8" maxLength:"128"`
+		Password         string `json:"password" required:"true" minLength:"8" maxLength:"72"`
 		DisplayName      string `json:"display_name,omitempty" maxLength:"255"`
 		OrganizationName string `json:"organization_name" required:"true" maxLength:"255"`
 	}
@@ -278,7 +278,7 @@ type switchOrgInput struct {
 type acceptInviteInput struct {
 	Body struct {
 		Token       string `json:"token" required:"true"`
-		Password    string `json:"password,omitempty" minLength:"8" maxLength:"128"`
+		Password    string `json:"password,omitempty" minLength:"8" maxLength:"72"`
 		DisplayName string `json:"display_name,omitempty" maxLength:"255"`
 	}
 }
