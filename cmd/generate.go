@@ -96,15 +96,10 @@ var generateSdkCmd = &cobra.Command{
 
 		log.Println("1. Extracting OpenAPI Spec from Huma...")
 
-		// The served spec takes its version from buildinfo.Version, which is
-		// "dev" under `go run` -- and generation always runs from a dev tree, so
-		// the committed spec would carry "dev" and npmVersion=dev, which npm
-		// rejects. Stamp the release version (latest git tag) in before building
-		// the spec rather than rewriting the JSON afterwards: huma emits its own
-		// key order and compact formatting, and re-marshalling would churn the
-		// whole file.
+		// The SDK generators need the version as an argument (npmVersion,
+		// packageVersion). The spec itself gets it from buildOpenAPISpecBytes,
+		// which stamps buildinfo.Version for every caller.
 		specVersion := releaseVersion()
-		buildinfo.Version = specVersion
 		log.Printf("spec/SDK version: %s", specVersion)
 
 		b, err := buildOpenAPISpecBytes()
@@ -1051,6 +1046,14 @@ func generateOpenAPISpec(outPath string) error {
 // registration matters. Shared by the SDK and Terraform generators so both emit
 // the same complete spec.
 func buildOpenAPISpecBytes() ([]byte, error) {
+	// Stamp the release version HERE rather than in the callers: the spec takes
+	// its version from buildinfo.Version, which is "dev" under `go run`, and
+	// both `generate sdk` and `generate terraform` write docs/openapi.json.
+	// Stamping in one caller only meant the other silently overwrote the file
+	// with "dev" -- which is exactly what `just release-prep` (sdk then
+	// terraform) did on its first run.
+	buildinfo.Version = releaseVersion()
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Printf("config.Load() failed (%v); using defaults for spec generation", err)
