@@ -7,9 +7,12 @@ ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /ui
 
 # Install deps first so this layer caches unless the lockfile changes.
-COPY ui/package.json ui/yarn.lock ./
-RUN corepack enable && corepack prepare yarn@1.22.22 --activate \
-    && yarn install --frozen-lockfile
+# .yarnrc.yml is required here, not optional: it sets nodeLinker: node-modules,
+# without which yarn 4 defaults to PnP and vite/tsc resolve differently than
+# they do locally. The yarn version comes from package.json's packageManager
+# field, so corepack activates whatever is pinned there.
+COPY ui/package.json ui/yarn.lock ui/.yarnrc.yml ./
+RUN corepack enable && yarn install --immutable
 
 # Build the SPA (tsc -b && vite build) -> /ui/dist
 COPY ui/ ./

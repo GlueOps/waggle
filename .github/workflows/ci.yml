@@ -85,21 +85,26 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
+      # corepack must be enabled BEFORE setup-node: its `cache: yarn` probe
+      # shells out to the global yarn, which refuses to run at all once
+      # package.json declares packageManager: yarn@4.x ("the current global
+      # version of Yarn is 1.22.22").
+      - name: Enable corepack
+        run: corepack enable
+
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
           cache: yarn
           cache-dependency-path: ui/yarn.lock
 
-      # --frozen-lockfile matches the Dockerfile: it fails if yarn.lock is out
+      # --immutable is yarn 4's --frozen-lockfile: it fails if yarn.lock is out
       # of sync with package.json, which is exactly the drift that broke every
-      # build on main between 3fb8102 and #26.
+      # build on main between 3fb8102 and #26. The yarn version comes from
+      # packageManager, so corepack activates whatever is pinned there.
       - name: Install
         working-directory: ui
-        run: |
-          corepack enable
-          corepack prepare yarn@1.22.22 --activate
-          yarn install --frozen-lockfile
+        run: yarn install --immutable
 
       - name: Lint
         working-directory: ui

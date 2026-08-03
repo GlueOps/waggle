@@ -22,6 +22,20 @@
       ],
       "matchDepNames": ["actions/checkout"],
       "allowedVersions": "<7"
+    },
+    {
+      "description": [
+        "Defer TypeScript v7.",
+        "@hey-api/openapi-ts takes typescript as a peer with an open upper bound, so",
+        "nothing else blocks a major bump, but it does not support TS 7 yet: generation",
+        "dies with \"Cannot read properties of undefined\" and `waggle generate sdk` can",
+        "no longer regenerate ui/src/sdk. TS 6.0.3 works.",
+        "Drop this rule once hey-api/hey-api#4235 ships a fix.",
+        "See https://github.com/hey-api/hey-api/issues/4235"
+      ],
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<7.0.0"
     }
   ]
 }
