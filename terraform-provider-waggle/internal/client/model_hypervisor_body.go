@@ -5,6 +5,7 @@ package client
 // HypervisorBody - HypervisorBody struct
 type HypervisorBody struct {
 	Schema string `json:"$schema,omitempty"`
+	CpuOvercommitRatio float64 `json:"cpu_overcommit_ratio,omitempty"`
 	CpuReserved int64 `json:"cpu_reserved"`
 	CpuTotal int64 `json:"cpu_total"`
 	DatacenterId string `json:"datacenter_id"`

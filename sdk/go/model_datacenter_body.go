@@ -22,11 +22,12 @@ var _ MappedNullable = &DatacenterBody{}
 // DatacenterBody struct for DatacenterBody
 type DatacenterBody struct {
 	// A URL to the JSON Schema for this object.
-	Schema             *string `json:"$schema,omitempty"`
-	InsecureSkipVerify *bool   `json:"insecure_skip_verify,omitempty"`
-	Name               string  `json:"name"`
-	Token              *string `json:"token,omitempty"`
-	Url                string  `json:"url"`
+	Schema             *string  `json:"$schema,omitempty"`
+	CpuOvercommitRatio *float64 `json:"cpu_overcommit_ratio,omitempty"`
+	InsecureSkipVerify *bool    `json:"insecure_skip_verify,omitempty"`
+	Name               string   `json:"name"`
+	Token              *string  `json:"token,omitempty"`
+	Url                string   `json:"url"`
 }
 
 type _DatacenterBody DatacenterBody
@@ -80,6 +81,38 @@ func (o *DatacenterBody) HasSchema() bool {
 // SetSchema gets a reference to the given string and assigns it to the Schema field.
 func (o *DatacenterBody) SetSchema(v string) {
 	o.Schema = &v
+}
+
+// GetCpuOvercommitRatio returns the CpuOvercommitRatio field value if set, zero value otherwise.
+func (o *DatacenterBody) GetCpuOvercommitRatio() float64 {
+	if o == nil || IsNil(o.CpuOvercommitRatio) {
+		var ret float64
+		return ret
+	}
+	return *o.CpuOvercommitRatio
+}
+
+// GetCpuOvercommitRatioOk returns a tuple with the CpuOvercommitRatio field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *DatacenterBody) GetCpuOvercommitRatioOk() (*float64, bool) {
+	if o == nil || IsNil(o.CpuOvercommitRatio) {
+		return nil, false
+	}
+	return o.CpuOvercommitRatio, true
+}
+
+// HasCpuOvercommitRatio returns a boolean if a field has been set.
+func (o *DatacenterBody) HasCpuOvercommitRatio() bool {
+	if o != nil && !IsNil(o.CpuOvercommitRatio) {
+		return true
+	}
+
+	return false
+}
+
+// SetCpuOvercommitRatio gets a reference to the given float64 and assigns it to the CpuOvercommitRatio field.
+func (o *DatacenterBody) SetCpuOvercommitRatio(v float64) {
+	o.CpuOvercommitRatio = &v
 }
 
 // GetInsecureSkipVerify returns the InsecureSkipVerify field value if set, zero value otherwise.
@@ -206,6 +239,9 @@ func (o DatacenterBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Schema) {
 		toSerialize["$schema"] = o.Schema
+	}
+	if !IsNil(o.CpuOvercommitRatio) {
+		toSerialize["cpu_overcommit_ratio"] = o.CpuOvercommitRatio
 	}
 	if !IsNil(o.InsecureSkipVerify) {
 		toSerialize["insecure_skip_verify"] = o.InsecureSkipVerify

@@ -30,6 +30,12 @@ export interface HypervisorBody {
      * @type {number}
      * @memberof HypervisorBody
      */
+    cpuOvercommitRatio?: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof HypervisorBody
+     */
     cpuReserved: number;
     /**
      * 
@@ -107,6 +113,7 @@ export function HypervisorBodyFromJSONTyped(json: any, ignoreDiscriminator: bool
     return {
         
         '$schema': json['$schema'] == null ? undefined : json['$schema'],
+        'cpuOvercommitRatio': json['cpu_overcommit_ratio'] == null ? undefined : json['cpu_overcommit_ratio'],
         'cpuReserved': json['cpu_reserved'],
         'cpuTotal': json['cpu_total'],
         'datacenterId': json['datacenter_id'],
@@ -130,6 +137,7 @@ export function HypervisorBodyToJSONTyped(value?: Omit<HypervisorBody, '$schema'
 
     return {
         
+        'cpu_overcommit_ratio': value['cpuOvercommitRatio'],
         'cpu_reserved': value['cpuReserved'],
         'cpu_total': value['cpuTotal'],
         'datacenter_id': value['datacenterId'],

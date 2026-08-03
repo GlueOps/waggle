@@ -27,6 +27,12 @@ export interface DatacenterBody {
     readonly $schema?: string;
     /**
      * 
+     * @type {number}
+     * @memberof DatacenterBody
+     */
+    cpuOvercommitRatio?: number;
+    /**
+     * 
      * @type {boolean}
      * @memberof DatacenterBody
      */
@@ -71,6 +77,7 @@ export function DatacenterBodyFromJSONTyped(json: any, ignoreDiscriminator: bool
     return {
         
         '$schema': json['$schema'] == null ? undefined : json['$schema'],
+        'cpuOvercommitRatio': json['cpu_overcommit_ratio'] == null ? undefined : json['cpu_overcommit_ratio'],
         'insecureSkipVerify': json['insecure_skip_verify'] == null ? undefined : json['insecure_skip_verify'],
         'name': json['name'],
         'token': json['token'] == null ? undefined : json['token'],
@@ -89,6 +96,7 @@ export function DatacenterBodyToJSONTyped(value?: Omit<DatacenterBody, '$schema'
 
     return {
         
+        'cpu_overcommit_ratio': value['cpuOvercommitRatio'],
         'insecure_skip_verify': value['insecureSkipVerify'],
         'name': value['name'],
         'token': value['token'],

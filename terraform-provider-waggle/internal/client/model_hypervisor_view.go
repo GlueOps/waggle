@@ -6,6 +6,8 @@ package client
 type HypervisorView struct {
 	Schema string `json:"$schema,omitempty"`
 	CpuBookable int64 `json:"cpu_bookable,omitempty"`
+	CpuEffectiveTotal int64 `json:"cpu_effective_total,omitempty"`
+	CpuOvercommitRatio float64 `json:"cpu_overcommit_ratio"`
 	CpuReserved int64 `json:"cpu_reserved"`
 	CpuTotal int64 `json:"cpu_total"`
 	CpuUsed int64 `json:"cpu_used,omitempty"`

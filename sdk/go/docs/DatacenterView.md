@@ -5,6 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Schema** | Pointer to **string** | A URL to the JSON Schema for this object. | [optional] [readonly] 
+**CpuOvercommitRatio** | **float64** | Default vCPU sold per physical core, stamped onto hypervisors as they are discovered here. 1.0 is no overcommit. Changing it does not re-rate existing hypervisors. | 
 **CreatedAt** | **time.Time** |  | 
 **HasToken** | **bool** | Whether a Proxmox API token is configured (the token itself is never returned). | 
 **Id** | **string** |  | 
@@ -17,7 +18,7 @@ Name | Type | Description | Notes
 
 ### NewDatacenterView
 
-`func NewDatacenterView(createdAt time.Time, hasToken bool, id string, insecureSkipVerify bool, name string, updatedAt time.Time, url string, ) *DatacenterView`
+`func NewDatacenterView(cpuOvercommitRatio float64, createdAt time.Time, hasToken bool, id string, insecureSkipVerify bool, name string, updatedAt time.Time, url string, ) *DatacenterView`
 
 NewDatacenterView instantiates a new DatacenterView object
 This constructor will assign default values to properties that have it defined,
@@ -56,6 +57,26 @@ SetSchema sets Schema field to given value.
 `func (o *DatacenterView) HasSchema() bool`
 
 HasSchema returns a boolean if a field has been set.
+
+### GetCpuOvercommitRatio
+
+`func (o *DatacenterView) GetCpuOvercommitRatio() float64`
+
+GetCpuOvercommitRatio returns the CpuOvercommitRatio field if non-nil, zero value otherwise.
+
+### GetCpuOvercommitRatioOk
+
+`func (o *DatacenterView) GetCpuOvercommitRatioOk() (*float64, bool)`
+
+GetCpuOvercommitRatioOk returns a tuple with the CpuOvercommitRatio field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetCpuOvercommitRatio
+
+`func (o *DatacenterView) SetCpuOvercommitRatio(v float64)`
+
+SetCpuOvercommitRatio sets CpuOvercommitRatio field to given value.
+
 
 ### GetCreatedAt
 

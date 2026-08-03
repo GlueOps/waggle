@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `$schema` | string
+`cpuOvercommitRatio` | number
 `createdAt` | Date
 `hasToken` | boolean
 `id` | string
@@ -23,6 +24,7 @@ import type { DatacenterView } from '@glueops/waggle-sdk'
 // TODO: Update the object below with actual values
 const example = {
   "$schema": null,
+  "cpuOvercommitRatio": null,
   "createdAt": null,
   "hasToken": null,
   "id": null,

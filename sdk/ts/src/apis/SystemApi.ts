@@ -23,6 +23,11 @@ import {
     HealthOutputBodyFromJSON,
     HealthOutputBodyToJSON,
 } from '../models/HealthOutputBody';
+import {
+    type VersionOutputBody,
+    VersionOutputBodyFromJSON,
+    VersionOutputBodyToJSON,
+} from '../models/VersionOutputBody';
 
 /**
  * 
@@ -63,6 +68,43 @@ export class SystemApi extends runtime.BaseAPI {
      */
     async health(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HealthOutputBody> {
         const response = await this.healthRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for version without sending the request
+     */
+    async versionRequestOpts(): Promise<runtime.RequestOpts> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/version`;
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Server version
+     */
+    async versionRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<VersionOutputBody>> {
+        const requestOptions = await this.versionRequestOpts();
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => VersionOutputBodyFromJSON(jsonValue));
+    }
+
+    /**
+     * Server version
+     */
+    async version(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<VersionOutputBody> {
+        const response = await this.versionRaw(initOverrides);
         return await response.value();
     }
 

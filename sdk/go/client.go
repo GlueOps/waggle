@@ -58,7 +58,7 @@ type APIClient struct {
 
 	OrganizationsAPI *OrganizationsAPIService
 
-	PlacementAPI *PlacementAPIService
+	PlacementsAPI *PlacementsAPIService
 
 	PoolsAPI *PoolsAPIService
 
@@ -88,7 +88,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.DatacentersAPI = (*DatacentersAPIService)(&c.common)
 	c.HypervisorsAPI = (*HypervisorsAPIService)(&c.common)
 	c.OrganizationsAPI = (*OrganizationsAPIService)(&c.common)
-	c.PlacementAPI = (*PlacementAPIService)(&c.common)
+	c.PlacementsAPI = (*PlacementsAPIService)(&c.common)
 	c.PoolsAPI = (*PoolsAPIService)(&c.common)
 	c.SlotsAPI = (*SlotsAPIService)(&c.common)
 	c.SystemAPI = (*SystemAPIService)(&c.common)

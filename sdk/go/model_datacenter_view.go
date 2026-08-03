@@ -23,8 +23,10 @@ var _ MappedNullable = &DatacenterView{}
 // DatacenterView struct for DatacenterView
 type DatacenterView struct {
 	// A URL to the JSON Schema for this object.
-	Schema    *string   `json:"$schema,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	Schema *string `json:"$schema,omitempty"`
+	// Default vCPU sold per physical core, stamped onto hypervisors as they are discovered here. 1.0 is no overcommit. Changing it does not re-rate existing hypervisors.
+	CpuOvercommitRatio float64   `json:"cpu_overcommit_ratio"`
+	CreatedAt          time.Time `json:"created_at"`
 	// Whether a Proxmox API token is configured (the token itself is never returned).
 	HasToken bool   `json:"has_token"`
 	Id       string `json:"id"`
@@ -41,8 +43,9 @@ type _DatacenterView DatacenterView
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewDatacenterView(createdAt time.Time, hasToken bool, id string, insecureSkipVerify bool, name string, updatedAt time.Time, url string) *DatacenterView {
+func NewDatacenterView(cpuOvercommitRatio float64, createdAt time.Time, hasToken bool, id string, insecureSkipVerify bool, name string, updatedAt time.Time, url string) *DatacenterView {
 	this := DatacenterView{}
+	this.CpuOvercommitRatio = cpuOvercommitRatio
 	this.CreatedAt = createdAt
 	this.HasToken = hasToken
 	this.Id = id
@@ -91,6 +94,30 @@ func (o *DatacenterView) HasSchema() bool {
 // SetSchema gets a reference to the given string and assigns it to the Schema field.
 func (o *DatacenterView) SetSchema(v string) {
 	o.Schema = &v
+}
+
+// GetCpuOvercommitRatio returns the CpuOvercommitRatio field value
+func (o *DatacenterView) GetCpuOvercommitRatio() float64 {
+	if o == nil {
+		var ret float64
+		return ret
+	}
+
+	return o.CpuOvercommitRatio
+}
+
+// GetCpuOvercommitRatioOk returns a tuple with the CpuOvercommitRatio field value
+// and a boolean to check if the value has been set.
+func (o *DatacenterView) GetCpuOvercommitRatioOk() (*float64, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.CpuOvercommitRatio, true
+}
+
+// SetCpuOvercommitRatio sets field value
+func (o *DatacenterView) SetCpuOvercommitRatio(v float64) {
+	o.CpuOvercommitRatio = v
 }
 
 // GetCreatedAt returns the CreatedAt field value
@@ -274,6 +301,7 @@ func (o DatacenterView) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Schema) {
 		toSerialize["$schema"] = o.Schema
 	}
+	toSerialize["cpu_overcommit_ratio"] = o.CpuOvercommitRatio
 	toSerialize["created_at"] = o.CreatedAt
 	toSerialize["has_token"] = o.HasToken
 	toSerialize["id"] = o.Id
@@ -289,6 +317,7 @@ func (o *DatacenterView) UnmarshalJSON(data []byte) (err error) {
 	// by unmarshalling the object into a generic map with string keys and checking
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
+		"cpu_overcommit_ratio",
 		"created_at",
 		"has_token",
 		"id",

@@ -26,11 +26,23 @@ export interface HypervisorView {
      */
     readonly $schema?: string;
     /**
-     * 
+     * cpu_effective_total minus reserved, existing-guest, and Waggle-committed vCPU.
      * @type {number}
      * @memberof HypervisorView
      */
     cpuBookable: number;
+    /**
+     * Schedulable vCPU pool: cpu_total x cpu_overcommit_ratio, rounded down.
+     * @type {number}
+     * @memberof HypervisorView
+     */
+    cpuEffectiveTotal: number;
+    /**
+     * vCPU sold per physical core on this node. 1.0 is no overcommit.
+     * @type {number}
+     * @memberof HypervisorView
+     */
+    cpuOvercommitRatio: number;
     /**
      * 
      * @type {number}
@@ -38,7 +50,7 @@ export interface HypervisorView {
      */
     cpuReserved: number;
     /**
-     * 
+     * Physical cores on the node.
      * @type {number}
      * @memberof HypervisorView
      */
@@ -146,6 +158,8 @@ export interface HypervisorView {
  */
 export function instanceOfHypervisorView(value: object): value is HypervisorView {
     if (!('cpuBookable' in value) || value['cpuBookable'] === undefined) return false;
+    if (!('cpuEffectiveTotal' in value) || value['cpuEffectiveTotal'] === undefined) return false;
+    if (!('cpuOvercommitRatio' in value) || value['cpuOvercommitRatio'] === undefined) return false;
     if (!('cpuReserved' in value) || value['cpuReserved'] === undefined) return false;
     if (!('cpuTotal' in value) || value['cpuTotal'] === undefined) return false;
     if (!('cpuUsed' in value) || value['cpuUsed'] === undefined) return false;
@@ -178,6 +192,8 @@ export function HypervisorViewFromJSONTyped(json: any, ignoreDiscriminator: bool
         
         '$schema': json['$schema'] == null ? undefined : json['$schema'],
         'cpuBookable': json['cpu_bookable'],
+        'cpuEffectiveTotal': json['cpu_effective_total'],
+        'cpuOvercommitRatio': json['cpu_overcommit_ratio'],
         'cpuReserved': json['cpu_reserved'],
         'cpuTotal': json['cpu_total'],
         'cpuUsed': json['cpu_used'],
@@ -211,6 +227,8 @@ export function HypervisorViewToJSONTyped(value?: Omit<HypervisorView, '$schema'
     return {
         
         'cpu_bookable': value['cpuBookable'],
+        'cpu_effective_total': value['cpuEffectiveTotal'],
+        'cpu_overcommit_ratio': value['cpuOvercommitRatio'],
         'cpu_reserved': value['cpuReserved'],
         'cpu_total': value['cpuTotal'],
         'cpu_used': value['cpuUsed'],

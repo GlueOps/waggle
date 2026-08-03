@@ -5,6 +5,7 @@ package client
 // DatacenterView - DatacenterView struct
 type DatacenterView struct {
 	Schema string `json:"$schema,omitempty"`
+	CpuOvercommitRatio float64 `json:"cpu_overcommit_ratio"`
 	CreatedAt string `json:"created_at,omitempty"`
 	HasToken bool `json:"has_token,omitempty"`
 	Id string `json:"id,omitempty"`

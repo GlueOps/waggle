@@ -1,5 +1,5 @@
 
-# PlacementView
+# VersionOutputBody
 
 
 ## Properties
@@ -7,28 +7,22 @@
 Name | Type
 ------------ | -------------
 `$schema` | string
-`createdAt` | Date
-`hypervisorId` | string
-`hypervisorName` | string
-`id` | string
-`poolId` | string
-`vmid` | number
+`commit` | string
+`date` | string
+`version` | string
 
 ## Example
 
 ```typescript
-import type { PlacementView } from '@glueops/waggle-sdk'
+import type { VersionOutputBody } from '@glueops/waggle-sdk'
 
 // TODO: Update the object below with actual values
 const example = {
   "$schema": null,
-  "createdAt": null,
-  "hypervisorId": null,
-  "hypervisorName": null,
-  "id": null,
-  "poolId": null,
-  "vmid": null,
-} satisfies PlacementView
+  "commit": null,
+  "date": null,
+  "version": null,
+} satisfies VersionOutputBody
 
 console.log(example)
 
@@ -37,7 +31,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as PlacementView
+const exampleParsed = JSON.parse(exampleJSON) as VersionOutputBody
 console.log(exampleParsed)
 ```
 

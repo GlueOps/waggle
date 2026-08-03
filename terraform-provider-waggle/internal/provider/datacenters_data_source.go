@@ -31,6 +31,10 @@ func (d *DatacentersDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 	resp.Schema = schema.Schema{
 		Description: "Fetches a datacenters data source.",
 		Attributes: map[string]schema.Attribute{
+			"cpu_overcommit_ratio": schema.Float64Attribute{
+				Required:    true,
+				Description: "Default vCPU sold per physical core, stamped onto hypervisors as they are discovered here. 1.0 is no overcommit. Changing it does not re-rate existing hypervisors.",
+			},
 			"created_at": schema.StringAttribute{
 				Required:    true,
 				Description: "",

@@ -9,18 +9,22 @@ import (
 
 // DatacentersModel is the Terraform model for datacenters.
 type DatacentersModel struct {
-	CreatedAt          types.String `tfsdk:"created_at"`
-	HasToken           types.Bool   `tfsdk:"has_token"`
-	Id                 types.String `tfsdk:"id"`
-	InsecureSkipVerify types.Bool   `tfsdk:"insecure_skip_verify"`
-	Name               types.String `tfsdk:"name"`
-	UpdatedAt          types.String `tfsdk:"updated_at"`
-	Url                types.String `tfsdk:"url"`
+	CpuOvercommitRatio types.Float64 `tfsdk:"cpu_overcommit_ratio"`
+	CreatedAt          types.String  `tfsdk:"created_at"`
+	HasToken           types.Bool    `tfsdk:"has_token"`
+	Id                 types.String  `tfsdk:"id"`
+	InsecureSkipVerify types.Bool    `tfsdk:"insecure_skip_verify"`
+	Name               types.String  `tfsdk:"name"`
+	UpdatedAt          types.String  `tfsdk:"updated_at"`
+	Url                types.String  `tfsdk:"url"`
 }
 
 // ToClientModel converts a Terraform model to a client model.
 func (m *DatacentersModel) ToClientModel() *client.DatacenterView {
 	out := &client.DatacenterView{}
+	if !m.CpuOvercommitRatio.IsNull() && !m.CpuOvercommitRatio.IsUnknown() {
+		out.CpuOvercommitRatio = float64(m.CpuOvercommitRatio.ValueFloat64())
+	}
 	if !m.CreatedAt.IsNull() && !m.CreatedAt.IsUnknown() {
 		out.CreatedAt = m.CreatedAt.ValueString()
 	}
@@ -47,6 +51,7 @@ func (m *DatacentersModel) ToClientModel() *client.DatacenterView {
 
 // FromClientModel updates the Terraform model from a client model.
 func (m *DatacentersModel) FromClientModel(c *client.DatacenterView) {
+	m.CpuOvercommitRatio = types.Float64Value(float64(c.CpuOvercommitRatio))
 	m.CreatedAt = types.StringValue(c.CreatedAt)
 	m.HasToken = types.BoolValue(c.HasToken)
 	m.Id = types.StringValue(c.Id)

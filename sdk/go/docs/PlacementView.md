@@ -9,13 +9,14 @@ Name | Type | Description | Notes
 **HypervisorId** | **string** |  | 
 **HypervisorName** | **string** |  | 
 **Id** | **string** |  | 
+**PoolId** | **string** |  | 
 **Vmid** | Pointer to **int64** |  | [optional] 
 
 ## Methods
 
 ### NewPlacementView
 
-`func NewPlacementView(createdAt time.Time, hypervisorId string, hypervisorName string, id string, ) *PlacementView`
+`func NewPlacementView(createdAt time.Time, hypervisorId string, hypervisorName string, id string, poolId string, ) *PlacementView`
 
 NewPlacementView instantiates a new PlacementView object
 This constructor will assign default values to properties that have it defined,
@@ -133,6 +134,26 @@ and a boolean to check if the value has been set.
 `func (o *PlacementView) SetId(v string)`
 
 SetId sets Id field to given value.
+
+
+### GetPoolId
+
+`func (o *PlacementView) GetPoolId() string`
+
+GetPoolId returns the PoolId field if non-nil, zero value otherwise.
+
+### GetPoolIdOk
+
+`func (o *PlacementView) GetPoolIdOk() (*string, bool)`
+
+GetPoolIdOk returns a tuple with the PoolId field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetPoolId
+
+`func (o *PlacementView) SetPoolId(v string)`
+
+SetPoolId sets PoolId field to given value.
 
 
 ### GetVmid

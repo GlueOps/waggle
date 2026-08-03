@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `$schema` | string
+`cpuOvercommitRatio` | number
 `cpuReserved` | number
 `cpuTotal` | number
 `datacenterId` | string
@@ -25,6 +26,7 @@ import type { HypervisorBody } from '@glueops/waggle-sdk'
 // TODO: Update the object below with actual values
 const example = {
   "$schema": null,
+  "cpuOvercommitRatio": null,
   "cpuReserved": null,
   "cpuTotal": null,
   "datacenterId": null,

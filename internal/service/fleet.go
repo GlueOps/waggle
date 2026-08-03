@@ -29,6 +29,11 @@ const bytesPerGB = 1024 * 1024 * 1024
 
 // ReservationDefaults is the capacity held back from placement (OS/host
 // overhead) applied to newly-discovered hypervisors.
+//
+// The CPU overcommit ratio deliberately does NOT live here: this struct comes
+// from process config, which is shared by every tenant, and capacity policy
+// must not cross tenant boundaries. It is carried per-datacenter in the tenant
+// DB instead (Datacenter.CPUOvercommitRatio).
 type ReservationDefaults struct {
 	CPU    int
 	RAMGB  int
@@ -66,10 +71,19 @@ type DatacenterInput struct {
 	// InsecureSkipVerify: nil means "default false" on create / "leave
 	// unchanged" on update; non-nil sets it explicitly.
 	InsecureSkipVerify *bool
+	// CPUOvercommitRatio is the default stamped onto hypervisors discovered in
+	// this datacenter. nil means "default 1.0" on create / "leave unchanged"
+	// on update; non-nil sets it explicitly.
+	CPUOvercommitRatio *float64
 }
 
 func (in DatacenterInput) validate() error {
 	if in.Name == "" || in.URL == "" {
+		return ErrInvalidInput
+	}
+	// Same bounds as the per-hypervisor override — see MaxCPUOvercommitRatio.
+	if in.CPUOvercommitRatio != nil &&
+		(*in.CPUOvercommitRatio <= 0 || *in.CPUOvercommitRatio > MaxCPUOvercommitRatio) {
 		return ErrInvalidInput
 	}
 	return nil
@@ -126,9 +140,18 @@ func (s *FleetService) CreateDatacenter(ctx context.Context, orgID uuid.UUID, in
 	if err != nil {
 		return nil, err
 	}
-	dc := &tenant.Datacenter{Name: in.Name, Url: in.URL}
+	dc := &tenant.Datacenter{
+		Name: in.Name,
+		Url:  in.URL,
+		// Sell cores 1:1 unless asked otherwise, so adding the feature does
+		// not change the capacity of any fleet that never opts in.
+		CPUOvercommitRatio: tenant.DefaultCPUOvercommitRatio,
+	}
 	if in.InsecureSkipVerify != nil {
 		dc.InsecureSkipVerify = *in.InsecureSkipVerify
+	}
+	if in.CPUOvercommitRatio != nil {
+		dc.CPUOvercommitRatio = *in.CPUOvercommitRatio
 	}
 	if in.Token != nil && *in.Token != "" {
 		ct, iv, tag, err := s.encryptToken(ctx, orgID, *in.Token)
@@ -189,6 +212,12 @@ func (s *FleetService) UpdateDatacenter(ctx context.Context, orgID, id uuid.UUID
 	dc.Url = in.URL
 	if in.InsecureSkipVerify != nil {
 		dc.InsecureSkipVerify = *in.InsecureSkipVerify
+	}
+	// Affects nodes discovered from here on. Existing hypervisors keep the
+	// ratio they were stamped with; re-rating a live fleet has to be an
+	// explicit per-node act, not a side effect of editing the datacenter.
+	if in.CPUOvercommitRatio != nil {
+		dc.CPUOvercommitRatio = *in.CPUOvercommitRatio
 	}
 	if in.Token != nil && *in.Token != "" {
 		ct, iv, tag, err := s.encryptToken(ctx, orgID, *in.Token)
@@ -334,7 +363,17 @@ type HypervisorInput struct {
 	// Schedulable: nil means "default true" on create / "leave unchanged" on
 	// update; non-nil sets it explicitly.
 	Schedulable *bool
+	// CPUOvercommitRatio: nil means "use the configured default" on create /
+	// "leave unchanged" on update; non-nil sets it explicitly. Same
+	// omit-means-don't-touch contract as Schedulable.
+	CPUOvercommitRatio *float64
 }
+
+// MaxCPUOvercommitRatio caps how far a node may be oversold. Not a technical
+// limit — a guard against a fat-fingered 40 where 4.0 was meant, which would
+// silently book ten times the intended VMs. Also keeps the value inside the
+// column's numeric(5,2) range.
+const MaxCPUOvercommitRatio = 64.0
 
 func (in HypervisorInput) validate() error {
 	if in.Name == "" {
@@ -345,26 +384,38 @@ func (in HypervisorInput) validate() error {
 		in.DiskGBTotal < 0 || in.DiskGBReserved < 0 {
 		return ErrInvalidInput
 	}
+	// Reserved is checked against PHYSICAL cores, not the overcommitted pool:
+	// headroom means "cores the host keeps", so its ceiling shouldn't move
+	// when the operator changes how aggressively the rest is sold.
 	if in.CPUReserved > in.CPUTotal ||
 		in.RAMGBReserved > in.RAMGBTotal ||
 		in.DiskGBReserved > in.DiskGBTotal {
 		return ErrInvalidInput
 	}
+	// Ratios below 1 (deliberate underselling) are allowed; zero or negative
+	// is not — it would zero out the node's capacity rather than express a
+	// policy, and is indistinguishable from an unset field.
+	if in.CPUOvercommitRatio != nil &&
+		(*in.CPUOvercommitRatio <= 0 || *in.CPUOvercommitRatio > MaxCPUOvercommitRatio) {
+		return ErrInvalidInput
+	}
 	return nil
 }
 
-// datacenterExists verifies a datacenter with the given ID is present in the
-// tenant DB. A missing row is treated as a bad reference in the request
-// (ErrInvalidInput) rather than ErrNotFound.
-func datacenterExists(ctx context.Context, db *gorm.DB, id uuid.UUID) error {
+// loadDatacenter fetches a datacenter by ID from the tenant DB, doubling as
+// the existence check for inbound references. A missing row is treated as a
+// bad reference in the request (ErrInvalidInput) rather than ErrNotFound.
+// Callers that only need validity can ignore the returned row; hypervisor
+// creation uses it to inherit the datacenter's overcommit default.
+func loadDatacenter(ctx context.Context, db *gorm.DB, id uuid.UUID) (*tenant.Datacenter, error) {
 	var dc tenant.Datacenter
 	if err := db.WithContext(ctx).First(&dc, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrInvalidInput
+			return nil, ErrInvalidInput
 		}
-		return fmt.Errorf("verify datacenter: %w", err)
+		return nil, fmt.Errorf("verify datacenter: %w", err)
 	}
-	return nil
+	return &dc, nil
 }
 
 func (s *FleetService) CreateHypervisor(ctx context.Context, orgID uuid.UUID, in HypervisorInput) (*tenant.Hypervisor, error) {
@@ -375,7 +426,8 @@ func (s *FleetService) CreateHypervisor(ctx context.Context, orgID uuid.UUID, in
 	if err != nil {
 		return nil, err
 	}
-	if err := datacenterExists(ctx, db, in.DatacenterID); err != nil {
+	dc, err := loadDatacenter(ctx, db, in.DatacenterID)
+	if err != nil {
 		return nil, err
 	}
 	hv := &tenant.Hypervisor{
@@ -388,6 +440,12 @@ func (s *FleetService) CreateHypervisor(ctx context.Context, orgID uuid.UUID, in
 		DiskGBTotal:    in.DiskGBTotal,
 		DiskGBReserved: in.DiskGBReserved,
 		Schedulable:    in.Schedulable == nil || *in.Schedulable,
+		// An omitted ratio inherits the datacenter's default, so a manually
+		// registered node lands on the same footing as a discovered one.
+		CPUOvercommitRatio: dc.EffectiveCPUOvercommitRatio(),
+	}
+	if in.CPUOvercommitRatio != nil {
+		hv.CPUOvercommitRatio = *in.CPUOvercommitRatio
 	}
 	if err := db.WithContext(ctx).Create(hv).Error; err != nil {
 		return nil, fmt.Errorf("create hypervisor: %w", err)
@@ -408,6 +466,9 @@ func (s *FleetService) ListHypervisors(ctx context.Context, orgID uuid.UUID, dat
 	if err := q.Order("name").Find(&hvs).Error; err != nil {
 		return nil, fmt.Errorf("list hypervisors: %w", err)
 	}
+	if err := attachConsumption(db.WithContext(ctx), hvs); err != nil {
+		return nil, err
+	}
 	return hvs, nil
 }
 
@@ -416,14 +477,17 @@ func (s *FleetService) GetHypervisor(ctx context.Context, orgID, id uuid.UUID) (
 	if err != nil {
 		return nil, err
 	}
-	var hv tenant.Hypervisor
-	if err := db.WithContext(ctx).First(&hv, "id = ?", id).Error; err != nil {
+	hvs := make([]tenant.Hypervisor, 1)
+	if err := db.WithContext(ctx).First(&hvs[0], "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get hypervisor: %w", err)
 	}
-	return &hv, nil
+	if err := attachConsumption(db.WithContext(ctx), hvs); err != nil {
+		return nil, err
+	}
+	return &hvs[0], nil
 }
 
 func (s *FleetService) UpdateHypervisor(ctx context.Context, orgID, id uuid.UUID, in HypervisorInput) (*tenant.Hypervisor, error) {
@@ -442,7 +506,7 @@ func (s *FleetService) UpdateHypervisor(ctx context.Context, orgID, id uuid.UUID
 		return nil, fmt.Errorf("get hypervisor: %w", err)
 	}
 	if in.DatacenterID != hv.DatacenterID {
-		if err := datacenterExists(ctx, db, in.DatacenterID); err != nil {
+		if _, err := loadDatacenter(ctx, db, in.DatacenterID); err != nil {
 			return nil, err
 		}
 	}
@@ -457,10 +521,19 @@ func (s *FleetService) UpdateHypervisor(ctx context.Context, orgID, id uuid.UUID
 	if in.Schedulable != nil {
 		hv.Schedulable = *in.Schedulable
 	}
+	// Omitted means "leave unchanged": moving a node between datacenters must
+	// not silently re-rate it to the new datacenter's default.
+	if in.CPUOvercommitRatio != nil {
+		hv.CPUOvercommitRatio = *in.CPUOvercommitRatio
+	}
 	if err := db.WithContext(ctx).Save(&hv).Error; err != nil {
 		return nil, fmt.Errorf("update hypervisor: %w", err)
 	}
-	return &hv, nil
+	one := []tenant.Hypervisor{hv}
+	if err := attachConsumption(db.WithContext(ctx), one); err != nil {
+		return nil, err
+	}
+	return &one[0], nil
 }
 
 func (s *FleetService) DeleteHypervisor(ctx context.Context, orgID, id uuid.UUID) error {
@@ -515,12 +588,34 @@ func (s *FleetService) DiscoverHypervisors(ctx context.Context, orgID, datacente
 		return nil, fmt.Errorf("%w: %v", ErrDiscovery, err)
 	}
 
+	// vmids of guests Waggle already tracks in its placement ledger for this
+	// datacenter. NodeUsage excludes them so discovered CPUUsed reflects only
+	// non-Waggle guests; the ledger accounts for Waggle's own VMs at scheduling
+	// time. Counting both would double-subtract their capacity. vmid is
+	// cluster-unique in Proxmox, so a flat set (not keyed per hypervisor) is
+	// both sufficient and drift-safe: a migrated VM is still excluded wherever
+	// discovery finds it, staying counted exactly once via the ledger.
+	var managedVMIDs []int
+	if err := db.WithContext(ctx).
+		Table("placements").
+		Joins("JOIN hypervisors ON hypervisors.id = placements.hypervisor_id").
+		Where("hypervisors.datacenter_id = ?", dc.ID).
+		Where("placements.vmid IS NOT NULL").
+		Distinct().
+		Pluck("placements.vmid", &managedVMIDs).Error; err != nil {
+		return nil, fmt.Errorf("load managed vmids: %w", err)
+	}
+	managed := make(map[int]struct{}, len(managedVMIDs))
+	for _, v := range managedVMIDs {
+		managed[v] = struct{}{}
+	}
+
 	now := time.Now().UTC()
 	for _, n := range nodes {
 		// Capacity already committed to existing guests, so bookable space
 		// reflects reality rather than assuming an empty node. Best-effort:
 		// usage errors don't abort discovery of the rest of the node's data.
-		usage, uerr := client.NodeUsage(ctx, n.Name)
+		usage, uerr := client.NodeUsage(ctx, n.Name, managed)
 		if uerr != nil {
 			usage = proxmox.NodeUsage{}
 		}
@@ -533,13 +628,16 @@ func (s *FleetService) DiscoverHypervisors(ctx context.Context, orgID, datacente
 			CPUUsed:      usage.VCPU,
 			RAMGBUsed:    int(usage.MemBytes / bytesPerGB),
 			DiskGBUsed:   int(usage.DiskBytes / bytesPerGB),
-			// Reserved + Schedulable apply to INSERT only (excluded from
-			// DoUpdates), so operator overrides survive re-discovery.
-			CPUReserved:    s.reserve.CPU,
-			RAMGBReserved:  s.reserve.RAMGB,
-			DiskGBReserved: s.reserve.DiskGB,
-			Schedulable:    true,
-			LastSyncedAt:   &now,
+			// Reserved + Schedulable + overcommit apply to INSERT only
+			// (excluded from DoUpdates), so operator overrides survive
+			// re-discovery. The overcommit ratio comes from the datacenter
+			// rather than process config so the policy stays tenant-scoped.
+			CPUReserved:        s.reserve.CPU,
+			RAMGBReserved:      s.reserve.RAMGB,
+			DiskGBReserved:     s.reserve.DiskGB,
+			Schedulable:        true,
+			CPUOvercommitRatio: dc.EffectiveCPUOvercommitRatio(),
+			LastSyncedAt:       &now,
 		}
 		if err := db.WithContext(ctx).Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "datacenter_id"}, {Name: "name"}},

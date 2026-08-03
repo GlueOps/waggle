@@ -111,29 +111,12 @@ func (s *FleetService) plan(tx *gorm.DB, datacenterID, slotID, poolID uuid.UUID,
 		hvIDs[i] = h.ID
 	}
 
-	// Capacity consumed by every existing placement, summed per hypervisor.
-	type consumedRow struct {
-		HypervisorID uuid.UUID
-		CPU          int
-		RAM          int
-		Disk         int
-	}
-	var crows []consumedRow
-	if err := tx.Table("placements").
-		Select("placements.hypervisor_id AS hypervisor_id, "+
-			"COALESCE(SUM(slots.vcpu),0) AS cpu, "+
-			"COALESCE(SUM(slots.ram_gb),0) AS ram, "+
-			"COALESCE(SUM(slots.disk_gb),0) AS disk").
-		Joins("JOIN pools ON pools.id = placements.pool_id").
-		Joins("JOIN slots ON slots.id = pools.slot_id").
-		Where("placements.hypervisor_id IN ?", hvIDs).
-		Group("placements.hypervisor_id").
-		Scan(&crows).Error; err != nil {
-		return nil, fmt.Errorf("compute consumed capacity: %w", err)
-	}
-	consumed := make(map[uuid.UUID]consumedRow, len(crows))
-	for _, r := range crows {
-		consumed[r.HypervisorID] = r
+	// Capacity committed by every existing placement, summed per hypervisor.
+	// Shared with the hypervisor view (see consumedByHypervisor) so scheduling
+	// and the bookable figure never disagree on Waggle's committed footprint.
+	consumed, err := consumedByHypervisor(tx, hvIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	// How many of THIS pool's VMs already sit on each hypervisor (spread bias).
@@ -163,7 +146,12 @@ func (s *FleetService) plan(tx *gorm.DB, datacenterID, slotID, poolID uuid.UUID,
 			id: h.ID,
 			// Bookable = total − operator headroom − existing-guest allocation
 			// (from discovery) − capacity already consumed by Waggle placements.
-			cpuRemaining:  (h.CPUTotal - h.CPUReserved - h.CPUUsed) - c.CPU,
+			//
+			// CPU starts from the OVERCOMMITTED total (cores × ratio) rather
+			// than the physical core count; the three subtrahends are already
+			// vCPU counts, so they come off unscaled. RAM and disk are not
+			// overcommittable and keep their physical totals.
+			cpuRemaining:  (h.EffectiveCPUTotal() - h.CPUReserved - h.CPUUsed) - c.CPU,
 			ramRemaining:  (h.RAMGBTotal - h.RAMGBReserved - h.RAMGBUsed) - c.RAM,
 			diskRemaining: (h.DiskGBTotal - h.DiskGBReserved - h.DiskGBUsed) - c.Disk,
 			poolCount:     poolCounts[h.ID],
@@ -175,6 +163,72 @@ func (s *FleetService) plan(tx *gorm.DB, datacenterID, slotID, poolID uuid.UUID,
 		return nil, &CapacityError{Requested: count, Fit: fit}
 	}
 	return ids, nil
+}
+
+// consumedCapacity is a hypervisor's committed footprint from the placement
+// ledger: the summed slot cost of every placement booked onto it.
+type consumedCapacity struct {
+	CPU  int
+	RAM  int
+	Disk int
+}
+
+// consumedByHypervisor sums placed slot cost per hypervisor for the given
+// hypervisor IDs. It underpins both scheduling (plan) and the hypervisor
+// view's bookable figure, so the two never disagree on Waggle's committed
+// capacity. Pass the caller's tx when running inside a locking transaction.
+func consumedByHypervisor(db *gorm.DB, hvIDs []uuid.UUID) (map[uuid.UUID]consumedCapacity, error) {
+	if len(hvIDs) == 0 {
+		return map[uuid.UUID]consumedCapacity{}, nil
+	}
+	type row struct {
+		HypervisorID uuid.UUID
+		CPU          int
+		RAM          int
+		Disk         int
+	}
+	var rows []row
+	if err := db.Table("placements").
+		Select("placements.hypervisor_id AS hypervisor_id, "+
+			"COALESCE(SUM(slots.vcpu),0) AS cpu, "+
+			"COALESCE(SUM(slots.ram_gb),0) AS ram, "+
+			"COALESCE(SUM(slots.disk_gb),0) AS disk").
+		Joins("JOIN pools ON pools.id = placements.pool_id").
+		Joins("JOIN slots ON slots.id = pools.slot_id").
+		Where("placements.hypervisor_id IN ?", hvIDs).
+		Group("placements.hypervisor_id").
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("compute consumed capacity: %w", err)
+	}
+	out := make(map[uuid.UUID]consumedCapacity, len(rows))
+	for _, r := range rows {
+		out[r.HypervisorID] = consumedCapacity{CPU: r.CPU, RAM: r.RAM, Disk: r.Disk}
+	}
+	return out, nil
+}
+
+// attachConsumption fills the transient Consumed* fields on each hypervisor
+// from the placement ledger, so the API view's bookable figure accounts for
+// Waggle's committed capacity. Mutates hvs in place.
+func attachConsumption(db *gorm.DB, hvs []tenant.Hypervisor) error {
+	if len(hvs) == 0 {
+		return nil
+	}
+	ids := make([]uuid.UUID, len(hvs))
+	for i := range hvs {
+		ids[i] = hvs[i].ID
+	}
+	consumed, err := consumedByHypervisor(db, ids)
+	if err != nil {
+		return err
+	}
+	for i := range hvs {
+		c := consumed[hvs[i].ID]
+		hvs[i].CPUConsumed = c.CPU
+		hvs[i].RAMGBConsumed = c.RAM
+		hvs[i].DiskGBConsumed = c.Disk
+	}
+	return nil
 }
 
 type PoolInput struct {
@@ -500,9 +554,9 @@ func (s *FleetService) ListAllPlacements(ctx context.Context, orgID uuid.UUID) (
 	var rows []FleetPlacementView
 	if err := db.WithContext(ctx).
 		Table("placements").
-		Select("placements.id AS id, placements.pool_id AS pool_id, pools.name AS pool_name, "+
-			"placements.hypervisor_id AS hypervisor_id, hypervisors.name AS hypervisor_name, "+
-			"slots.name AS slot_name, slots.vcpu AS vcpu, slots.ram_gb AS ram_gb, slots.disk_gb AS disk_gb, "+
+		Select("placements.id AS id, placements.pool_id AS pool_id, pools.name AS pool_name, " +
+			"placements.hypervisor_id AS hypervisor_id, hypervisors.name AS hypervisor_name, " +
+			"slots.name AS slot_name, slots.vcpu AS vcpu, slots.ram_gb AS ram_gb, slots.disk_gb AS disk_gb, " +
 			"placements.vmid AS vmid, placements.created_at AS created_at").
 		Joins("JOIN pools ON pools.id = placements.pool_id").
 		Joins("JOIN hypervisors ON hypervisors.id = placements.hypervisor_id").

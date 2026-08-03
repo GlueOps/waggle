@@ -22,16 +22,17 @@ var _ MappedNullable = &HypervisorBody{}
 // HypervisorBody struct for HypervisorBody
 type HypervisorBody struct {
 	// A URL to the JSON Schema for this object.
-	Schema         *string `json:"$schema,omitempty"`
-	CpuReserved    int64   `json:"cpu_reserved"`
-	CpuTotal       int64   `json:"cpu_total"`
-	DatacenterId   string  `json:"datacenter_id"`
-	DiskGbReserved int64   `json:"disk_gb_reserved"`
-	DiskGbTotal    int64   `json:"disk_gb_total"`
-	Name           string  `json:"name"`
-	RamGbReserved  int64   `json:"ram_gb_reserved"`
-	RamGbTotal     int64   `json:"ram_gb_total"`
-	Schedulable    *bool   `json:"schedulable,omitempty"`
+	Schema             *string  `json:"$schema,omitempty"`
+	CpuOvercommitRatio *float64 `json:"cpu_overcommit_ratio,omitempty"`
+	CpuReserved        int64    `json:"cpu_reserved"`
+	CpuTotal           int64    `json:"cpu_total"`
+	DatacenterId       string   `json:"datacenter_id"`
+	DiskGbReserved     int64    `json:"disk_gb_reserved"`
+	DiskGbTotal        int64    `json:"disk_gb_total"`
+	Name               string   `json:"name"`
+	RamGbReserved      int64    `json:"ram_gb_reserved"`
+	RamGbTotal         int64    `json:"ram_gb_total"`
+	Schedulable        *bool    `json:"schedulable,omitempty"`
 }
 
 type _HypervisorBody HypervisorBody
@@ -91,6 +92,38 @@ func (o *HypervisorBody) HasSchema() bool {
 // SetSchema gets a reference to the given string and assigns it to the Schema field.
 func (o *HypervisorBody) SetSchema(v string) {
 	o.Schema = &v
+}
+
+// GetCpuOvercommitRatio returns the CpuOvercommitRatio field value if set, zero value otherwise.
+func (o *HypervisorBody) GetCpuOvercommitRatio() float64 {
+	if o == nil || IsNil(o.CpuOvercommitRatio) {
+		var ret float64
+		return ret
+	}
+	return *o.CpuOvercommitRatio
+}
+
+// GetCpuOvercommitRatioOk returns a tuple with the CpuOvercommitRatio field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *HypervisorBody) GetCpuOvercommitRatioOk() (*float64, bool) {
+	if o == nil || IsNil(o.CpuOvercommitRatio) {
+		return nil, false
+	}
+	return o.CpuOvercommitRatio, true
+}
+
+// HasCpuOvercommitRatio returns a boolean if a field has been set.
+func (o *HypervisorBody) HasCpuOvercommitRatio() bool {
+	if o != nil && !IsNil(o.CpuOvercommitRatio) {
+		return true
+	}
+
+	return false
+}
+
+// SetCpuOvercommitRatio gets a reference to the given float64 and assigns it to the CpuOvercommitRatio field.
+func (o *HypervisorBody) SetCpuOvercommitRatio(v float64) {
+	o.CpuOvercommitRatio = &v
 }
 
 // GetCpuReserved returns the CpuReserved field value
@@ -329,6 +362,9 @@ func (o HypervisorBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Schema) {
 		toSerialize["$schema"] = o.Schema
+	}
+	if !IsNil(o.CpuOvercommitRatio) {
+		toSerialize["cpu_overcommit_ratio"] = o.CpuOvercommitRatio
 	}
 	toSerialize["cpu_reserved"] = o.CpuReserved
 	toSerialize["cpu_total"] = o.CpuTotal

@@ -35,7 +35,16 @@ func (r *HypervisorsResource) Schema(_ context.Context, _ resource.SchemaRequest
 		Attributes: map[string]schema.Attribute{
 			"cpu_bookable": schema.Int64Attribute{
 				Computed:    true,
-				Description: "",
+				Description: "cpu_effective_total minus reserved, existing-guest, and Waggle-committed vCPU.",
+			},
+			"cpu_effective_total": schema.Int64Attribute{
+				Computed:    true,
+				Description: "Schedulable vCPU pool: cpu_total x cpu_overcommit_ratio, rounded down.",
+			},
+			"cpu_overcommit_ratio": schema.Float64Attribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "vCPU sold per physical core on this node. 1.0 is no overcommit.",
 			},
 			"cpu_reserved": schema.Int64Attribute{
 				Required:    true,
@@ -43,7 +52,7 @@ func (r *HypervisorsResource) Schema(_ context.Context, _ resource.SchemaRequest
 			},
 			"cpu_total": schema.Int64Attribute{
 				Required:    true,
-				Description: "",
+				Description: "Physical cores on the node.",
 			},
 			"cpu_used": schema.Int64Attribute{
 				Computed:    true,
@@ -169,6 +178,10 @@ func (r *HypervisorsResource) Read(ctx context.Context, req resource.ReadRequest
 
 	respBody, err := r.client.DoRequest(ctx, "GET", fmt.Sprintf("/hypervisors/%v", state.Id.ValueString()), nil)
 	if err != nil {
+		if isNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError("Error reading hypervisors", err.Error())
 		return
 	}

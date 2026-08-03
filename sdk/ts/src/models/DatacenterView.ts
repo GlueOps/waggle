@@ -26,6 +26,12 @@ export interface DatacenterView {
      */
     readonly $schema?: string;
     /**
+     * Default vCPU sold per physical core, stamped onto hypervisors as they are discovered here. 1.0 is no overcommit. Changing it does not re-rate existing hypervisors.
+     * @type {number}
+     * @memberof DatacenterView
+     */
+    cpuOvercommitRatio: number;
+    /**
      * 
      * @type {Date}
      * @memberof DatacenterView
@@ -73,6 +79,7 @@ export interface DatacenterView {
  * Check if a given object implements the DatacenterView interface.
  */
 export function instanceOfDatacenterView(value: object): value is DatacenterView {
+    if (!('cpuOvercommitRatio' in value) || value['cpuOvercommitRatio'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('hasToken' in value) || value['hasToken'] === undefined) return false;
     if (!('id' in value) || value['id'] === undefined) return false;
@@ -94,6 +101,7 @@ export function DatacenterViewFromJSONTyped(json: any, ignoreDiscriminator: bool
     return {
         
         '$schema': json['$schema'] == null ? undefined : json['$schema'],
+        'cpuOvercommitRatio': json['cpu_overcommit_ratio'],
         'createdAt': (new Date(json['created_at'])),
         'hasToken': json['has_token'],
         'id': json['id'],
@@ -115,6 +123,7 @@ export function DatacenterViewToJSONTyped(value?: Omit<DatacenterView, '$schema'
 
     return {
         
+        'cpu_overcommit_ratio': value['cpuOvercommitRatio'],
         'created_at': value['createdAt'].toISOString(),
         'has_token': value['hasToken'],
         'id': value['id'],
