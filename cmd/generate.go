@@ -212,9 +212,27 @@ func generateTSUIHey() error {
 		return err
 	}
 
+	// The generator version lives in package.json / yarn.lock, NOT in an inline
+	// `npx --yes pkg@x.y.z` pin here. Two reasons:
+	//
+	//  1. Renovate only reads manifest files, so a version pinned in Go source
+	//     is invisible to it. This pin said 0.93.0 while package.json declared
+	//     0.99.0 -- the drift is not hypothetical.
+	//  2. `npx --yes` resolves the tool in its own sandbox, ignoring the repo's
+	//     TypeScript pin. openapi-ts declares typescript as a peer with an open
+	//     upper bound, so npx installs TS 7, which it does not yet support --
+	//     it dies with "Cannot read properties of undefined". See
+	//     https://github.com/hey-api/hey-api/issues/4235. Installing from the
+	//     lockfile first is what holds TypeScript at 6.x.
+	//
+	// --immutable so the lockfile is authoritative and CI cannot silently float
+	// to a different generator than a developer machine.
+	if err := run(exec.Command("yarn", "install", "--immutable"), "yarn install (js toolchain)"); err != nil {
+		return err
+	}
+
 	// Assumes openapi-ts.config.ts or openapi-ts.config.mjs exists at repo root.
-	// Pin exact version on purpose.
-	cmd := exec.Command("npx", "--yes", "@hey-api/openapi-ts@0.93.0")
+	cmd := exec.Command(filepath.Join("node_modules", ".bin", "openapi-ts"))
 	if err := run(cmd, "hey-api ui sdk -> "+outDir); err != nil {
 		return err
 	}
@@ -557,6 +575,16 @@ var generateTerraformOAGCmd = &cobra.Command{
 			log.Printf("restored hand-authored examples under %s", examplesDir)
 		}
 
+		// The RemoveAll above takes go.sum with it and the generator only writes
+		// go.mod, so without this the provider module has no checksums and fails
+		// to build until someone runs tidy by hand. Mirrors what generateGo does
+		// for the Go SDK.
+		tidyProvider := exec.Command("go", "mod", "tidy")
+		tidyProvider.Dir = outDir
+		if err := run(tidyProvider, "go mod tidy -> "+outDir); err != nil {
+			return err
+		}
+
 		log.Println("OpenAPI Generator Terraform provider generated successfully.")
 		return nil
 	},
@@ -658,13 +686,13 @@ var resourceSchemaRoles = map[string]map[string]schemaRole{
 	// PlacementView client model for server-assigned fields; (2) patchResourceSchemaRoles
 	// validates idempotently that the overlay already has the correct roles.
 	"placements": {
-		"placement_id":   roleRequired,
-		"id":             roleComputed,
-		"vmid":           roleOptional,
-		"pool_id":        roleComputed,
-		"hypervisor_id":  roleComputed,
+		"placement_id":    roleRequired,
+		"id":              roleComputed,
+		"vmid":            roleOptional,
+		"pool_id":         roleComputed,
+		"hypervisor_id":   roleComputed,
 		"hypervisor_name": roleComputed,
-		"created_at":     roleComputed,
+		"created_at":      roleComputed,
 	},
 }
 

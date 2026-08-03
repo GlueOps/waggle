@@ -25,6 +25,13 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Yarn 4 (berry) local state. The cache lives outside the project
+# (enableGlobalCache: true in .yarnrc.yml), so only install-state is left here.
+# .yarnrc.yml and yarn.lock ARE tracked — they pin the toolchain.
+**/.yarn/*
+!**/.yarn/patches
+!**/.yarn/releases
+
 # ---- Code-gen / tooling scratch ----
 repomix-readme.md
 repomix-output.*
