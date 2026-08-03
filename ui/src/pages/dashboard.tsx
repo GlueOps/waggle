@@ -103,9 +103,17 @@ export function DashboardPage() {
       { reserved: 0, used: 0, pending: 0, total: 0 }
     )
 
-  const cpu = seg((h) => ({ reserved: h.cpu_reserved, used: h.cpu_used, pending: pend(h).cpu, total: h.cpu_total }))
+  // CPU meters measure against the EFFECTIVE total (cores x overcommit ratio),
+  // which is what the scheduler books against. Using cpu_total would render an
+  // oversold node as permanently over-full and understate fleet capacity.
+  const cpu = seg((h) => ({ reserved: h.cpu_reserved, used: h.cpu_used, pending: pend(h).cpu, total: h.cpu_effective_total }))
   const ram = seg((h) => ({ reserved: h.ram_gb_reserved, used: h.ram_gb_used, pending: pend(h).ram, total: h.ram_gb_total }))
   const disk = seg((h) => ({ reserved: h.disk_gb_reserved, used: h.disk_gb_used, pending: pend(h).disk, total: h.disk_gb_total }))
+
+  // Physical cores, kept alongside the effective vCPU pool so the card can show
+  // what the hardware actually is as well as what is being sold from it.
+  const cores = hvs.reduce((a, h) => a + h.cpu_total, 0)
+  const oversold = cores > 0 && cpu.total !== cores
 
   const schedulable = hvs.filter((h) => h.schedulable).length
   const stats = [
@@ -140,7 +148,16 @@ export function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader><CardDescription className="flex items-center gap-2"><Cpu className="size-4" /> vCPU</CardDescription></CardHeader>
-          <CardContent><StackedMeter seg={cpu} unit="cores" /></CardContent>
+          <CardContent>
+            <StackedMeter seg={cpu} unit="vCPU" />
+            {/* The meter is vCPU (cores x ratio); this line keeps the physical
+                hardware visible so an overcommitted fleet is not mistaken for
+                having more cores than it does. */}
+            <p className="text-muted-foreground mt-2 text-xs">
+              {cores} physical {cores === 1 ? "core" : "cores"}
+              {oversold && ` · ${(cpu.total / cores).toFixed(2)}x overcommit`}
+            </p>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader><CardDescription className="flex items-center gap-2"><MemoryStick className="size-4" /> Memory</CardDescription></CardHeader>
@@ -183,7 +200,14 @@ export function DashboardPage() {
                   return (
                     <TableRow key={h.id}>
                       <TableCell className="font-medium">{h.name}</TableCell>
-                      <TableCell><StackedMeter seg={{ reserved: h.cpu_reserved, used: h.cpu_used, pending: pp.cpu, total: h.cpu_total }} unit="" /></TableCell>
+                      <TableCell>
+                        <StackedMeter seg={{ reserved: h.cpu_reserved, used: h.cpu_used, pending: pp.cpu, total: h.cpu_effective_total }} unit="" />
+                        <p className="text-muted-foreground mt-1 text-xs">
+                          {h.cpu_total} {h.cpu_total === 1 ? "core" : "cores"}
+                          {h.cpu_overcommit_ratio !== 1 &&
+                            ` × ${h.cpu_overcommit_ratio} = ${h.cpu_effective_total} vCPU`}
+                        </p>
+                      </TableCell>
                       <TableCell><StackedMeter seg={{ reserved: h.ram_gb_reserved, used: h.ram_gb_used, pending: pp.ram, total: h.ram_gb_total }} unit="GB" /></TableCell>
                       <TableCell><StackedMeter seg={{ reserved: h.disk_gb_reserved, used: h.disk_gb_used, pending: pp.disk, total: h.disk_gb_total }} unit="GB" /></TableCell>
                       <TableCell>

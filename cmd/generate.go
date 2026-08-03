@@ -13,6 +13,7 @@ import (
 
 	"github.com/glueops/waggle/internal/api"
 	"github.com/glueops/waggle/internal/app"
+	"github.com/glueops/waggle/internal/buildinfo"
 	"github.com/glueops/waggle/internal/config"
 	"github.com/glueops/waggle/internal/service"
 	"github.com/riverqueue/river"
@@ -95,6 +96,17 @@ var generateSdkCmd = &cobra.Command{
 
 		log.Println("1. Extracting OpenAPI Spec from Huma...")
 
+		// The served spec takes its version from buildinfo.Version, which is
+		// "dev" under `go run` -- and generation always runs from a dev tree, so
+		// the committed spec would carry "dev" and npmVersion=dev, which npm
+		// rejects. Stamp the release version (latest git tag) in before building
+		// the spec rather than rewriting the JSON afterwards: huma emits its own
+		// key order and compact formatting, and re-marshalling would churn the
+		// whole file.
+		specVersion := releaseVersion()
+		buildinfo.Version = specVersion
+		log.Printf("spec/SDK version: %s", specVersion)
+
 		b, err := buildOpenAPISpecBytes()
 		if err != nil {
 			return err
@@ -105,18 +117,6 @@ var generateSdkCmd = &cobra.Command{
 		}
 		if err := os.WriteFile("docs/openapi.json", b, 0o644); err != nil {
 			return fmt.Errorf("failed to write docs/openapi.json: %w", err)
-		}
-
-		specVersion := "0.0.0"
-		{
-			var doc struct {
-				Info struct {
-					Version string `json:"version"`
-				} `json:"info"`
-			}
-			if json.Unmarshal(b, &doc) == nil && strings.TrimSpace(doc.Info.Version) != "" {
-				specVersion = strings.TrimPrefix(strings.TrimSpace(doc.Info.Version), "v")
-			}
 		}
 
 		log.Println("2. Generating embedded TypeScript SDK for UI with Hey API (ui/src/sdk)...")
@@ -1246,4 +1246,36 @@ func patchResourceRead404(outDir string) error {
 		log.Printf("note: no unpatched resource Read 404 handlers found under %s; skipping", providerDir)
 	}
 	return nil
+}
+
+// semverish matches a bare MAJOR.MINOR.PATCH with optional pre-release/build
+// metadata. Used to reject values like "dev" that npm and the Go SDK
+// generator cannot use as a package version.
+var semverish = regexp.MustCompile(`^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$`)
+
+// releaseVersion is the version stamped into the generated spec and SDKs.
+//
+// It reads the VERSION file rather than `git describe`, because git describe
+// returns the LAST tag reachable from HEAD -- so regenerating while preparing
+// release N+1 would stamp N into artifacts that then ship inside the vN+1 tag,
+// leaving every committed artifact one release behind. VERSION is bumped as
+// the first step of a release, so `just sdk` before tagging produces artifacts
+// that already carry the version the tag will use.
+//
+// This governs committed artifacts only. The RUNNING binary reports
+// buildinfo.Version, injected from the git tag via -ldflags in the Dockerfile,
+// so what the UI shows is always the real build regardless of this file.
+func releaseVersion() string {
+	const fallback = "0.0.0"
+	b, err := os.ReadFile("VERSION")
+	if err != nil {
+		log.Printf("could not read VERSION (%v); using %s", err, fallback)
+		return fallback
+	}
+	v := strings.TrimPrefix(strings.TrimSpace(string(b)), "v")
+	if !semverish.MatchString(v) {
+		log.Printf("VERSION %q is not semver; using %s", v, fallback)
+		return fallback
+	}
+	return v
 }
