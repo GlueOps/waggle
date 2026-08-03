@@ -74,11 +74,20 @@ export function DashboardPage() {
   const placements = plQ.data?.items ?? []
   const pools = poolQ.data?.items ?? []
 
-  // Pending (Waggle-placed, not yet provisioned) capacity per hypervisor.
-  // Placements with a vmid already have a real VM running; exclude them.
+  // Capacity Waggle has committed per hypervisor: EVERY placement, whether or
+  // not it has been provisioned yet.
+  //
+  // This used to skip placements with a vmid, because discovery counted those
+  // VMs as real guests in *_used and counting them here too would double up.
+  // Discovery now excludes vmids Waggle tracks (so the ledger is the single
+  // source for its own VMs), which inverted the rule: skipping them here left
+  // provisioned placements in NEITHER *_used NOR this map, and their capacity
+  // vanished from the dashboard entirely.
+  //
+  // Counting all placements mirrors consumedByHypervisor on the server, so the
+  // meter agrees with cpu_bookable.
   const pendingByHv = new Map<string, { cpu: number; ram: number; disk: number }>()
   for (const p of placements) {
-    if (p.vmid != null) continue
     const cur = pendingByHv.get(p.hypervisor_name) ?? { cpu: 0, ram: 0, disk: 0 }
     cur.cpu += p.vcpu
     cur.ram += p.ram_gb
@@ -174,8 +183,8 @@ export function DashboardPage() {
           <CardTitle className="text-base">Hypervisors</CardTitle>
           <CardDescription className="flex flex-wrap gap-3">
             <LegendDot cls="bg-muted-foreground/40" label="reserved (OS)" />
-            <LegendDot cls="bg-primary" label="used (guests)" />
-            <LegendDot cls="bg-sky-500" label="pending (placed)" />
+            <LegendDot cls="bg-primary" label="used (other guests)" />
+            <LegendDot cls="bg-sky-500" label="placed (waggle)" />
           </CardDescription>
         </CardHeader>
         <CardContent>
