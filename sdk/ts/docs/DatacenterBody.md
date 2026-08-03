@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `$schema` | string
+`cpuOvercommitRatio` | number
 `insecureSkipVerify` | boolean
 `name` | string
 `token` | string
@@ -20,6 +21,7 @@ import type { DatacenterBody } from '@glueops/waggle-sdk'
 // TODO: Update the object below with actual values
 const example = {
   "$schema": null,
+  "cpuOvercommitRatio": null,
   "insecureSkipVerify": null,
   "name": null,
   "token": null,

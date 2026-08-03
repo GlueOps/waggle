@@ -8,6 +8,8 @@ Name | Type
 ------------ | -------------
 `$schema` | string
 `cpuBookable` | number
+`cpuEffectiveTotal` | number
+`cpuOvercommitRatio` | number
 `cpuReserved` | number
 `cpuTotal` | number
 `cpuUsed` | number
@@ -36,6 +38,8 @@ import type { HypervisorView } from '@glueops/waggle-sdk'
 const example = {
   "$schema": null,
   "cpuBookable": null,
+  "cpuEffectiveTotal": null,
+  "cpuOvercommitRatio": null,
   "cpuReserved": null,
   "cpuTotal": null,
   "cpuUsed": null,

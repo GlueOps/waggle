@@ -122,6 +122,7 @@ export type DatacenterBody = {
      * A URL to the JSON Schema for this object.
      */
     readonly $schema?: string;
+    cpu_overcommit_ratio?: number;
     insecure_skip_verify?: boolean;
     name: string;
     token?: string;
@@ -141,6 +142,10 @@ export type DatacenterView = {
      * A URL to the JSON Schema for this object.
      */
     readonly $schema?: string;
+    /**
+     * Default vCPU sold per physical core, stamped onto hypervisors as they are discovered here. 1.0 is no overcommit. Changing it does not re-rate existing hypervisors.
+     */
+    cpu_overcommit_ratio: number;
     created_at: string;
     /**
      * Whether a Proxmox API token is configured (the token itself is never returned).
@@ -254,6 +259,7 @@ export type HypervisorBody = {
      * A URL to the JSON Schema for this object.
      */
     readonly $schema?: string;
+    cpu_overcommit_ratio?: number;
     cpu_reserved: number;
     cpu_total: number;
     datacenter_id: string;
@@ -278,8 +284,22 @@ export type HypervisorView = {
      * A URL to the JSON Schema for this object.
      */
     readonly $schema?: string;
+    /**
+     * cpu_effective_total minus reserved, existing-guest, and Waggle-committed vCPU.
+     */
     cpu_bookable: number;
+    /**
+     * Schedulable vCPU pool: cpu_total x cpu_overcommit_ratio, rounded down.
+     */
+    cpu_effective_total: number;
+    /**
+     * vCPU sold per physical core on this node. 1.0 is no overcommit.
+     */
+    cpu_overcommit_ratio: number;
     cpu_reserved: number;
+    /**
+     * Physical cores on the node.
+     */
     cpu_total: number;
     /**
      * vCPU allocated to existing guests (from discovery).
@@ -446,42 +466,6 @@ export type PlacementView = {
     vmid?: number;
 };
 
-export type GetPlacementData = {
-    path: { id: string };
-    url: '/placements/{id}';
-};
-
-export type GetPlacementErrors = {
-    404: unknown;
-    422: unknown;
-};
-
-export type GetPlacementError = GetPlacementErrors[keyof GetPlacementErrors];
-
-export type GetPlacementResponses = {
-    200: PlacementView;
-};
-
-export type GetPlacementResponse = GetPlacementResponses[keyof GetPlacementResponses];
-
-export type DeletePlacementData = {
-    path: { id: string };
-    url: '/placements/{id}';
-};
-
-export type DeletePlacementErrors = {
-    404: unknown;
-    422: unknown;
-};
-
-export type DeletePlacementError = DeletePlacementErrors[keyof DeletePlacementErrors];
-
-export type DeletePlacementResponses = {
-    204: void;
-};
-
-export type DeletePlacementResponse = DeletePlacementResponses[keyof DeletePlacementResponses];
-
 export type PoolListOutputBody = {
     /**
      * A URL to the JSON Schema for this object.
@@ -621,6 +605,16 @@ export type VerifyEmailInputBody = {
     token: string;
 };
 
+export type VersionOutputBody = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    commit: string;
+    date: string;
+    version: string;
+};
+
 export type AcceptInviteInputBodyWritable = {
     display_name?: string;
     password?: string;
@@ -676,6 +670,7 @@ export type CreatePoolInputBodyWritable = {
 };
 
 export type DatacenterBodyWritable = {
+    cpu_overcommit_ratio?: number;
     insecure_skip_verify?: boolean;
     name: string;
     token?: string;
@@ -687,6 +682,10 @@ export type DatacenterListOutputBodyWritable = {
 };
 
 export type DatacenterViewWritable = {
+    /**
+     * Default vCPU sold per physical core, stamped onto hypervisors as they are discovered here. 1.0 is no overcommit. Changing it does not re-rate existing hypervisors.
+     */
+    cpu_overcommit_ratio: number;
     created_at: string;
     /**
      * Whether a Proxmox API token is configured (the token itself is never returned).
@@ -747,6 +746,7 @@ export type HealthOutputBodyWritable = {
 };
 
 export type HypervisorBodyWritable = {
+    cpu_overcommit_ratio?: number;
     cpu_reserved: number;
     cpu_total: number;
     datacenter_id: string;
@@ -763,8 +763,22 @@ export type HypervisorListOutputBodyWritable = {
 };
 
 export type HypervisorViewWritable = {
+    /**
+     * cpu_effective_total minus reserved, existing-guest, and Waggle-committed vCPU.
+     */
     cpu_bookable: number;
+    /**
+     * Schedulable vCPU pool: cpu_total x cpu_overcommit_ratio, rounded down.
+     */
+    cpu_effective_total: number;
+    /**
+     * vCPU sold per physical core on this node. 1.0 is no overcommit.
+     */
+    cpu_overcommit_ratio: number;
     cpu_reserved: number;
+    /**
+     * Physical cores on the node.
+     */
     cpu_total: number;
     /**
      * vCPU allocated to existing guests (from discovery).
@@ -871,6 +885,7 @@ export type PlacementViewWritable = {
     hypervisor_id: string;
     hypervisor_name: string;
     id: string;
+    pool_id: string;
     vmid?: number;
 };
 
@@ -955,6 +970,12 @@ export type UpdateOrgInputBodyWritable = {
 
 export type VerifyEmailInputBodyWritable = {
     token: string;
+};
+
+export type VersionOutputBodyWritable = {
+    commit: string;
+    date: string;
+    version: string;
 };
 
 export type ListApiKeysData = {
@@ -1816,6 +1837,60 @@ export type ListPlacementsResponses = {
 
 export type ListPlacementsResponse = ListPlacementsResponses[keyof ListPlacementsResponses];
 
+export type DeletePlacementData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/placements/{id}';
+};
+
+export type DeletePlacementErrors = {
+    /**
+     * Error
+     */
+    default: ErrorModel;
+};
+
+export type DeletePlacementError = DeletePlacementErrors[keyof DeletePlacementErrors];
+
+export type DeletePlacementResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeletePlacementResponse = DeletePlacementResponses[keyof DeletePlacementResponses];
+
+export type GetPlacementData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/placements/{id}';
+};
+
+export type GetPlacementErrors = {
+    /**
+     * Error
+     */
+    default: ErrorModel;
+};
+
+export type GetPlacementError = GetPlacementErrors[keyof GetPlacementErrors];
+
+export type GetPlacementResponses = {
+    /**
+     * OK
+     */
+    200: PlacementView;
+};
+
+export type GetPlacementResponse = GetPlacementResponses[keyof GetPlacementResponses];
+
 export type BackfillPlacementVmidData = {
     body: BackfillVmidInputBodyWritable;
     path: {
@@ -2136,3 +2211,28 @@ export type UpdateSlotResponses = {
 };
 
 export type UpdateSlotResponse = UpdateSlotResponses[keyof UpdateSlotResponses];
+
+export type VersionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/version';
+};
+
+export type VersionErrors = {
+    /**
+     * Error
+     */
+    default: ErrorModel;
+};
+
+export type VersionError = VersionErrors[keyof VersionErrors];
+
+export type VersionResponses = {
+    /**
+     * OK
+     */
+    200: VersionOutputBody;
+};
+
+export type VersionResponse = VersionResponses[keyof VersionResponses];

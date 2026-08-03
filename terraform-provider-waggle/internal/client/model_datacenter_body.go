@@ -5,6 +5,7 @@ package client
 // DatacenterBody - DatacenterBody struct
 type DatacenterBody struct {
 	Schema string `json:"$schema,omitempty"`
+	CpuOvercommitRatio float64 `json:"cpu_overcommit_ratio,omitempty"`
 	InsecureSkipVerify bool `json:"insecure_skip_verify,omitempty"`
 	Name string `json:"name"`
 	Token string `json:"token,omitempty"`

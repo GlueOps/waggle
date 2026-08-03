@@ -51,6 +51,12 @@ export interface PlacementView {
     id: string;
     /**
      * 
+     * @type {string}
+     * @memberof PlacementView
+     */
+    poolId: string;
+    /**
+     * 
      * @type {number}
      * @memberof PlacementView
      */
@@ -65,6 +71,7 @@ export function instanceOfPlacementView(value: object): value is PlacementView {
     if (!('hypervisorId' in value) || value['hypervisorId'] === undefined) return false;
     if (!('hypervisorName' in value) || value['hypervisorName'] === undefined) return false;
     if (!('id' in value) || value['id'] === undefined) return false;
+    if (!('poolId' in value) || value['poolId'] === undefined) return false;
     return true;
 }
 
@@ -83,6 +90,7 @@ export function PlacementViewFromJSONTyped(json: any, ignoreDiscriminator: boole
         'hypervisorId': json['hypervisor_id'],
         'hypervisorName': json['hypervisor_name'],
         'id': json['id'],
+        'poolId': json['pool_id'],
         'vmid': json['vmid'] == null ? undefined : json['vmid'],
     };
 }
@@ -102,6 +110,7 @@ export function PlacementViewToJSONTyped(value?: Omit<PlacementView, '$schema'> 
         'hypervisor_id': value['hypervisorId'],
         'hypervisor_name': value['hypervisorName'],
         'id': value['id'],
+        'pool_id': value['poolId'],
         'vmid': value['vmid'],
     };
 }

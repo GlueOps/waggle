@@ -5,6 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Schema** | Pointer to **string** | A URL to the JSON Schema for this object. | [optional] [readonly] 
+**CpuOvercommitRatio** | Pointer to **float64** |  | [optional] 
 **CpuReserved** | **int64** |  | 
 **CpuTotal** | **int64** |  | 
 **DatacenterId** | **string** |  | 
@@ -58,6 +59,31 @@ SetSchema sets Schema field to given value.
 `func (o *HypervisorBody) HasSchema() bool`
 
 HasSchema returns a boolean if a field has been set.
+
+### GetCpuOvercommitRatio
+
+`func (o *HypervisorBody) GetCpuOvercommitRatio() float64`
+
+GetCpuOvercommitRatio returns the CpuOvercommitRatio field if non-nil, zero value otherwise.
+
+### GetCpuOvercommitRatioOk
+
+`func (o *HypervisorBody) GetCpuOvercommitRatioOk() (*float64, bool)`
+
+GetCpuOvercommitRatioOk returns a tuple with the CpuOvercommitRatio field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetCpuOvercommitRatio
+
+`func (o *HypervisorBody) SetCpuOvercommitRatio(v float64)`
+
+SetCpuOvercommitRatio sets CpuOvercommitRatio field to given value.
+
+### HasCpuOvercommitRatio
+
+`func (o *HypervisorBody) HasCpuOvercommitRatio() bool`
+
+HasCpuOvercommitRatio returns a boolean if a field has been set.
 
 ### GetCpuReserved
 

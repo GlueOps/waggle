@@ -23,10 +23,16 @@ var _ MappedNullable = &HypervisorView{}
 // HypervisorView struct for HypervisorView
 type HypervisorView struct {
 	// A URL to the JSON Schema for this object.
-	Schema      *string `json:"$schema,omitempty"`
-	CpuBookable int64   `json:"cpu_bookable"`
-	CpuReserved int64   `json:"cpu_reserved"`
-	CpuTotal    int64   `json:"cpu_total"`
+	Schema *string `json:"$schema,omitempty"`
+	// cpu_effective_total minus reserved, existing-guest, and Waggle-committed vCPU.
+	CpuBookable int64 `json:"cpu_bookable"`
+	// Schedulable vCPU pool: cpu_total x cpu_overcommit_ratio, rounded down.
+	CpuEffectiveTotal int64 `json:"cpu_effective_total"`
+	// vCPU sold per physical core on this node. 1.0 is no overcommit.
+	CpuOvercommitRatio float64 `json:"cpu_overcommit_ratio"`
+	CpuReserved        int64   `json:"cpu_reserved"`
+	// Physical cores on the node.
+	CpuTotal int64 `json:"cpu_total"`
 	// vCPU allocated to existing guests (from discovery).
 	CpuUsed        int64     `json:"cpu_used"`
 	CreatedAt      time.Time `json:"created_at"`
@@ -55,9 +61,11 @@ type _HypervisorView HypervisorView
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewHypervisorView(cpuBookable int64, cpuReserved int64, cpuTotal int64, cpuUsed int64, createdAt time.Time, datacenterId string, diskGbBookable int64, diskGbReserved int64, diskGbTotal int64, diskGbUsed int64, id string, name string, ramGbBookable int64, ramGbReserved int64, ramGbTotal int64, ramGbUsed int64, schedulable bool, updatedAt time.Time) *HypervisorView {
+func NewHypervisorView(cpuBookable int64, cpuEffectiveTotal int64, cpuOvercommitRatio float64, cpuReserved int64, cpuTotal int64, cpuUsed int64, createdAt time.Time, datacenterId string, diskGbBookable int64, diskGbReserved int64, diskGbTotal int64, diskGbUsed int64, id string, name string, ramGbBookable int64, ramGbReserved int64, ramGbTotal int64, ramGbUsed int64, schedulable bool, updatedAt time.Time) *HypervisorView {
 	this := HypervisorView{}
 	this.CpuBookable = cpuBookable
+	this.CpuEffectiveTotal = cpuEffectiveTotal
+	this.CpuOvercommitRatio = cpuOvercommitRatio
 	this.CpuReserved = cpuReserved
 	this.CpuTotal = cpuTotal
 	this.CpuUsed = cpuUsed
@@ -140,6 +148,54 @@ func (o *HypervisorView) GetCpuBookableOk() (*int64, bool) {
 // SetCpuBookable sets field value
 func (o *HypervisorView) SetCpuBookable(v int64) {
 	o.CpuBookable = v
+}
+
+// GetCpuEffectiveTotal returns the CpuEffectiveTotal field value
+func (o *HypervisorView) GetCpuEffectiveTotal() int64 {
+	if o == nil {
+		var ret int64
+		return ret
+	}
+
+	return o.CpuEffectiveTotal
+}
+
+// GetCpuEffectiveTotalOk returns a tuple with the CpuEffectiveTotal field value
+// and a boolean to check if the value has been set.
+func (o *HypervisorView) GetCpuEffectiveTotalOk() (*int64, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.CpuEffectiveTotal, true
+}
+
+// SetCpuEffectiveTotal sets field value
+func (o *HypervisorView) SetCpuEffectiveTotal(v int64) {
+	o.CpuEffectiveTotal = v
+}
+
+// GetCpuOvercommitRatio returns the CpuOvercommitRatio field value
+func (o *HypervisorView) GetCpuOvercommitRatio() float64 {
+	if o == nil {
+		var ret float64
+		return ret
+	}
+
+	return o.CpuOvercommitRatio
+}
+
+// GetCpuOvercommitRatioOk returns a tuple with the CpuOvercommitRatio field value
+// and a boolean to check if the value has been set.
+func (o *HypervisorView) GetCpuOvercommitRatioOk() (*float64, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.CpuOvercommitRatio, true
+}
+
+// SetCpuOvercommitRatio sets field value
+func (o *HypervisorView) SetCpuOvercommitRatio(v float64) {
+	o.CpuOvercommitRatio = v
 }
 
 // GetCpuReserved returns the CpuReserved field value
@@ -596,6 +652,8 @@ func (o HypervisorView) ToMap() (map[string]interface{}, error) {
 		toSerialize["$schema"] = o.Schema
 	}
 	toSerialize["cpu_bookable"] = o.CpuBookable
+	toSerialize["cpu_effective_total"] = o.CpuEffectiveTotal
+	toSerialize["cpu_overcommit_ratio"] = o.CpuOvercommitRatio
 	toSerialize["cpu_reserved"] = o.CpuReserved
 	toSerialize["cpu_total"] = o.CpuTotal
 	toSerialize["cpu_used"] = o.CpuUsed
@@ -625,6 +683,8 @@ func (o *HypervisorView) UnmarshalJSON(data []byte) (err error) {
 	// that every required field exists as a key in the generic map.
 	requiredProperties := []string{
 		"cpu_bookable",
+		"cpu_effective_total",
+		"cpu_overcommit_ratio",
 		"cpu_reserved",
 		"cpu_total",
 		"cpu_used",

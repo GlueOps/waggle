@@ -5,6 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Schema** | Pointer to **string** | A URL to the JSON Schema for this object. | [optional] [readonly] 
+**CpuOvercommitRatio** | Pointer to **float64** |  | [optional] 
 **InsecureSkipVerify** | Pointer to **bool** |  | [optional] 
 **Name** | **string** |  | 
 **Token** | Pointer to **string** |  | [optional] 
@@ -53,6 +54,31 @@ SetSchema sets Schema field to given value.
 `func (o *DatacenterBody) HasSchema() bool`
 
 HasSchema returns a boolean if a field has been set.
+
+### GetCpuOvercommitRatio
+
+`func (o *DatacenterBody) GetCpuOvercommitRatio() float64`
+
+GetCpuOvercommitRatio returns the CpuOvercommitRatio field if non-nil, zero value otherwise.
+
+### GetCpuOvercommitRatioOk
+
+`func (o *DatacenterBody) GetCpuOvercommitRatioOk() (*float64, bool)`
+
+GetCpuOvercommitRatioOk returns a tuple with the CpuOvercommitRatio field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetCpuOvercommitRatio
+
+`func (o *DatacenterBody) SetCpuOvercommitRatio(v float64)`
+
+SetCpuOvercommitRatio sets CpuOvercommitRatio field to given value.
+
+### HasCpuOvercommitRatio
+
+`func (o *DatacenterBody) HasCpuOvercommitRatio() bool`
+
+HasCpuOvercommitRatio returns a boolean if a field has been set.
 
 ### GetInsecureSkipVerify
 

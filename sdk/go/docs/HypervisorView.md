@@ -5,9 +5,11 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **Schema** | Pointer to **string** | A URL to the JSON Schema for this object. | [optional] [readonly] 
-**CpuBookable** | **int64** |  | 
+**CpuBookable** | **int64** | cpu_effective_total minus reserved, existing-guest, and Waggle-committed vCPU. | 
+**CpuEffectiveTotal** | **int64** | Schedulable vCPU pool: cpu_total x cpu_overcommit_ratio, rounded down. | 
+**CpuOvercommitRatio** | **float64** | vCPU sold per physical core on this node. 1.0 is no overcommit. | 
 **CpuReserved** | **int64** |  | 
-**CpuTotal** | **int64** |  | 
+**CpuTotal** | **int64** | Physical cores on the node. | 
 **CpuUsed** | **int64** | vCPU allocated to existing guests (from discovery). | 
 **CreatedAt** | **time.Time** |  | 
 **DatacenterId** | **string** |  | 
@@ -29,7 +31,7 @@ Name | Type | Description | Notes
 
 ### NewHypervisorView
 
-`func NewHypervisorView(cpuBookable int64, cpuReserved int64, cpuTotal int64, cpuUsed int64, createdAt time.Time, datacenterId string, diskGbBookable int64, diskGbReserved int64, diskGbTotal int64, diskGbUsed int64, id string, name string, ramGbBookable int64, ramGbReserved int64, ramGbTotal int64, ramGbUsed int64, schedulable bool, updatedAt time.Time, ) *HypervisorView`
+`func NewHypervisorView(cpuBookable int64, cpuEffectiveTotal int64, cpuOvercommitRatio float64, cpuReserved int64, cpuTotal int64, cpuUsed int64, createdAt time.Time, datacenterId string, diskGbBookable int64, diskGbReserved int64, diskGbTotal int64, diskGbUsed int64, id string, name string, ramGbBookable int64, ramGbReserved int64, ramGbTotal int64, ramGbUsed int64, schedulable bool, updatedAt time.Time, ) *HypervisorView`
 
 NewHypervisorView instantiates a new HypervisorView object
 This constructor will assign default values to properties that have it defined,
@@ -87,6 +89,46 @@ and a boolean to check if the value has been set.
 `func (o *HypervisorView) SetCpuBookable(v int64)`
 
 SetCpuBookable sets CpuBookable field to given value.
+
+
+### GetCpuEffectiveTotal
+
+`func (o *HypervisorView) GetCpuEffectiveTotal() int64`
+
+GetCpuEffectiveTotal returns the CpuEffectiveTotal field if non-nil, zero value otherwise.
+
+### GetCpuEffectiveTotalOk
+
+`func (o *HypervisorView) GetCpuEffectiveTotalOk() (*int64, bool)`
+
+GetCpuEffectiveTotalOk returns a tuple with the CpuEffectiveTotal field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetCpuEffectiveTotal
+
+`func (o *HypervisorView) SetCpuEffectiveTotal(v int64)`
+
+SetCpuEffectiveTotal sets CpuEffectiveTotal field to given value.
+
+
+### GetCpuOvercommitRatio
+
+`func (o *HypervisorView) GetCpuOvercommitRatio() float64`
+
+GetCpuOvercommitRatio returns the CpuOvercommitRatio field if non-nil, zero value otherwise.
+
+### GetCpuOvercommitRatioOk
+
+`func (o *HypervisorView) GetCpuOvercommitRatioOk() (*float64, bool)`
+
+GetCpuOvercommitRatioOk returns a tuple with the CpuOvercommitRatio field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetCpuOvercommitRatio
+
+`func (o *HypervisorView) SetCpuOvercommitRatio(v float64)`
+
+SetCpuOvercommitRatio sets CpuOvercommitRatio field to given value.
 
 
 ### GetCpuReserved

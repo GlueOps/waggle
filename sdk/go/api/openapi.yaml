@@ -898,8 +898,61 @@ paths:
       summary: "List all placements in the tenant with pool, slot, and hypervisor\
         \ context (fleet overview)."
       tags:
-      - placement
+      - placements
   /placements/{id}:
+    delete:
+      operationId: delete-placement
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: Remove a placement. The pool's desired_count is not adjusted; resize
+        the pool to re-fill the vacancy.
+      tags:
+      - placements
+    get:
+      operationId: get-placement
+      parameters:
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlacementView"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+      - bearer: []
+      summary: "Fetch a single placement with its pool, hypervisor, and vmid."
+      tags:
+      - placements
     patch:
       operationId: backfill-placement-vmid
       parameters:
@@ -933,7 +986,7 @@ paths:
       - bearer: []
       summary: Attach the externally-assigned Proxmox vmid to a placement.
       tags:
-      - placement
+      - placements
   /pools:
     get:
       operationId: list-pools
@@ -1244,6 +1297,25 @@ paths:
       summary: Update a slot.
       tags:
       - slots
+  /version:
+    get:
+      operationId: version
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Server version
+      tags:
+      - system
 components:
   schemas:
     AcceptInviteInputBody:
@@ -1263,7 +1335,7 @@ components:
           maxLength: 255
           type: string
         password:
-          maxLength: 128
+          maxLength: 72
           minLength: 8
           type: string
         token:
@@ -1526,6 +1598,7 @@ components:
       example:
         $schema: https://openapi-generator.tech
         name: name
+        cpu_overcommit_ratio: 5.125300418950474
         insecure_skip_verify: true
         url: url
         token: token
@@ -1535,6 +1608,12 @@ components:
           format: uri
           readOnly: true
           type: string
+        cpu_overcommit_ratio:
+          exclusiveMinimum: true
+          format: double
+          maximum: 64
+          minimum: 0
+          type: number
         insecure_skip_verify:
           type: boolean
         name:
@@ -1559,6 +1638,7 @@ components:
           name: name
           created_at: 2000-01-23T04:56:07.000+00:00
           has_token: true
+          cpu_overcommit_ratio: 0.8008281904610115
           id: id
           insecure_skip_verify: true
           url: url
@@ -1567,6 +1647,7 @@ components:
           name: name
           created_at: 2000-01-23T04:56:07.000+00:00
           has_token: true
+          cpu_overcommit_ratio: 0.8008281904610115
           id: id
           insecure_skip_verify: true
           url: url
@@ -1591,6 +1672,7 @@ components:
         name: name
         created_at: 2000-01-23T04:56:07.000+00:00
         has_token: true
+        cpu_overcommit_ratio: 0.8008281904610115
         id: id
         insecure_skip_verify: true
         url: url
@@ -1600,6 +1682,12 @@ components:
           format: uri
           readOnly: true
           type: string
+        cpu_overcommit_ratio:
+          description: "Default vCPU sold per physical core, stamped onto hypervisors\
+            \ as they are discovered here. 1.0 is no overcommit. Changing it does\
+            \ not re-rate existing hypervisors."
+          format: double
+          type: number
         created_at:
           format: date-time
           type: string
@@ -1621,6 +1709,7 @@ components:
         url:
           type: string
       required:
+      - cpu_overcommit_ratio
       - created_at
       - has_token
       - id
@@ -1650,42 +1739,46 @@ components:
         - last_synced_at: 2000-01-23T04:56:07.000+00:00
           cpu_bookable: 0
           $schema: https://openapi-generator.tech
-          disk_gb_reserved: 2
+          cpu_effective_total: 6
+          disk_gb_reserved: 9
           created_at: 2000-01-23T04:56:07.000+00:00
-          cpu_reserved: 6
-          cpu_total: 1
-          disk_gb_total: 7
-          ram_gb_used: 7
-          cpu_used: 5
-          ram_gb_reserved: 2
+          cpu_reserved: 5
+          cpu_total: 5
+          disk_gb_total: 3
+          ram_gb_used: 1
+          cpu_used: 2
+          ram_gb_reserved: 7
           schedulable: true
           updated_at: 2000-01-23T04:56:07.000+00:00
-          disk_gb_bookable: 5
-          disk_gb_used: 9
+          disk_gb_bookable: 7
+          disk_gb_used: 2
           name: name
+          cpu_overcommit_ratio: 1.4658129805029452
           id: id
-          ram_gb_bookable: 3
-          ram_gb_total: 4
+          ram_gb_bookable: 4
+          ram_gb_total: 1
           datacenter_id: datacenter_id
         - last_synced_at: 2000-01-23T04:56:07.000+00:00
           cpu_bookable: 0
           $schema: https://openapi-generator.tech
-          disk_gb_reserved: 2
+          cpu_effective_total: 6
+          disk_gb_reserved: 9
           created_at: 2000-01-23T04:56:07.000+00:00
-          cpu_reserved: 6
-          cpu_total: 1
-          disk_gb_total: 7
-          ram_gb_used: 7
-          cpu_used: 5
-          ram_gb_reserved: 2
+          cpu_reserved: 5
+          cpu_total: 5
+          disk_gb_total: 3
+          ram_gb_used: 1
+          cpu_used: 2
+          ram_gb_reserved: 7
           schedulable: true
           updated_at: 2000-01-23T04:56:07.000+00:00
-          disk_gb_bookable: 5
-          disk_gb_used: 9
+          disk_gb_bookable: 7
+          disk_gb_used: 2
           name: name
+          cpu_overcommit_ratio: 1.4658129805029452
           id: id
-          ram_gb_bookable: 3
-          ram_gb_total: 4
+          ram_gb_bookable: 4
+          ram_gb_total: 1
           datacenter_id: datacenter_id
       properties:
         $schema:
@@ -1865,6 +1958,7 @@ components:
         disk_gb_reserved: 0
         schedulable: true
         name: name
+        cpu_overcommit_ratio: 5.125300418950474
         cpu_reserved: 0
         cpu_total: 0
         disk_gb_total: 0
@@ -1876,6 +1970,12 @@ components:
           format: uri
           readOnly: true
           type: string
+        cpu_overcommit_ratio:
+          exclusiveMinimum: true
+          format: double
+          maximum: 64
+          minimum: 0
+          type: number
         cpu_reserved:
           format: int64
           minimum: 0
@@ -1925,42 +2025,46 @@ components:
         - last_synced_at: 2000-01-23T04:56:07.000+00:00
           cpu_bookable: 0
           $schema: https://openapi-generator.tech
-          disk_gb_reserved: 2
+          cpu_effective_total: 6
+          disk_gb_reserved: 9
           created_at: 2000-01-23T04:56:07.000+00:00
-          cpu_reserved: 6
-          cpu_total: 1
-          disk_gb_total: 7
-          ram_gb_used: 7
-          cpu_used: 5
-          ram_gb_reserved: 2
+          cpu_reserved: 5
+          cpu_total: 5
+          disk_gb_total: 3
+          ram_gb_used: 1
+          cpu_used: 2
+          ram_gb_reserved: 7
           schedulable: true
           updated_at: 2000-01-23T04:56:07.000+00:00
-          disk_gb_bookable: 5
-          disk_gb_used: 9
+          disk_gb_bookable: 7
+          disk_gb_used: 2
           name: name
+          cpu_overcommit_ratio: 1.4658129805029452
           id: id
-          ram_gb_bookable: 3
-          ram_gb_total: 4
+          ram_gb_bookable: 4
+          ram_gb_total: 1
           datacenter_id: datacenter_id
         - last_synced_at: 2000-01-23T04:56:07.000+00:00
           cpu_bookable: 0
           $schema: https://openapi-generator.tech
-          disk_gb_reserved: 2
+          cpu_effective_total: 6
+          disk_gb_reserved: 9
           created_at: 2000-01-23T04:56:07.000+00:00
-          cpu_reserved: 6
-          cpu_total: 1
-          disk_gb_total: 7
-          ram_gb_used: 7
-          cpu_used: 5
-          ram_gb_reserved: 2
+          cpu_reserved: 5
+          cpu_total: 5
+          disk_gb_total: 3
+          ram_gb_used: 1
+          cpu_used: 2
+          ram_gb_reserved: 7
           schedulable: true
           updated_at: 2000-01-23T04:56:07.000+00:00
-          disk_gb_bookable: 5
-          disk_gb_used: 9
+          disk_gb_bookable: 7
+          disk_gb_used: 2
           name: name
+          cpu_overcommit_ratio: 1.4658129805029452
           id: id
-          ram_gb_bookable: 3
-          ram_gb_total: 4
+          ram_gb_bookable: 4
+          ram_gb_total: 1
           datacenter_id: datacenter_id
       properties:
         $schema:
@@ -1981,22 +2085,24 @@ components:
         last_synced_at: 2000-01-23T04:56:07.000+00:00
         cpu_bookable: 0
         $schema: https://openapi-generator.tech
-        disk_gb_reserved: 2
+        cpu_effective_total: 6
+        disk_gb_reserved: 9
         created_at: 2000-01-23T04:56:07.000+00:00
-        cpu_reserved: 6
-        cpu_total: 1
-        disk_gb_total: 7
-        ram_gb_used: 7
-        cpu_used: 5
-        ram_gb_reserved: 2
+        cpu_reserved: 5
+        cpu_total: 5
+        disk_gb_total: 3
+        ram_gb_used: 1
+        cpu_used: 2
+        ram_gb_reserved: 7
         schedulable: true
         updated_at: 2000-01-23T04:56:07.000+00:00
-        disk_gb_bookable: 5
-        disk_gb_used: 9
+        disk_gb_bookable: 7
+        disk_gb_used: 2
         name: name
+        cpu_overcommit_ratio: 1.4658129805029452
         id: id
-        ram_gb_bookable: 3
-        ram_gb_total: 4
+        ram_gb_bookable: 4
+        ram_gb_total: 1
         datacenter_id: datacenter_id
       properties:
         $schema:
@@ -2005,12 +2111,24 @@ components:
           readOnly: true
           type: string
         cpu_bookable:
+          description: "cpu_effective_total minus reserved, existing-guest, and Waggle-committed\
+            \ vCPU."
           format: int64
           type: integer
+        cpu_effective_total:
+          description: "Schedulable vCPU pool: cpu_total x cpu_overcommit_ratio, rounded\
+            \ down."
+          format: int64
+          type: integer
+        cpu_overcommit_ratio:
+          description: vCPU sold per physical core on this node. 1.0 is no overcommit.
+          format: double
+          type: number
         cpu_reserved:
           format: int64
           type: integer
         cpu_total:
+          description: Physical cores on the node.
           format: int64
           type: integer
         cpu_used:
@@ -2063,6 +2181,8 @@ components:
           type: string
       required:
       - cpu_bookable
+      - cpu_effective_total
+      - cpu_overcommit_ratio
       - cpu_reserved
       - cpu_total
       - cpu_used
@@ -2453,12 +2573,14 @@ components:
           created_at: 2000-01-23T04:56:07.000+00:00
           hypervisor_id: hypervisor_id
           id: id
+          pool_id: pool_id
         - $schema: https://openapi-generator.tech
           vmid: 0
           hypervisor_name: hypervisor_name
           created_at: 2000-01-23T04:56:07.000+00:00
           hypervisor_id: hypervisor_id
           id: id
+          pool_id: pool_id
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
@@ -2481,6 +2603,7 @@ components:
         created_at: 2000-01-23T04:56:07.000+00:00
         hypervisor_id: hypervisor_id
         id: id
+        pool_id: pool_id
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
@@ -2496,6 +2619,8 @@ components:
           type: string
         id:
           type: string
+        pool_id:
+          type: string
         vmid:
           format: int64
           type: integer
@@ -2504,6 +2629,7 @@ components:
       - hypervisor_id
       - hypervisor_name
       - id
+      - pool_id
     PoolListOutputBody:
       additionalProperties: false
       example:
@@ -2670,7 +2796,7 @@ components:
           maxLength: 255
           type: string
         password:
-          maxLength: 128
+          maxLength: 72
           minLength: 8
           type: string
       required:
@@ -2895,6 +3021,29 @@ components:
           type: string
       required:
       - token
+    VersionOutputBody:
+      additionalProperties: false
+      example:
+        date: date
+        $schema: https://openapi-generator.tech
+        commit: commit
+        version: version
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          format: uri
+          readOnly: true
+          type: string
+        commit:
+          type: string
+        date:
+          type: string
+        version:
+          type: string
+      required:
+      - commit
+      - date
+      - version
   securitySchemes:
     bearer:
       bearerFormat: JWT

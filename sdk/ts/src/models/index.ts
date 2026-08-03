@@ -51,3 +51,4 @@ export * from './SwitchOrgInputBody';
 export * from './UpdateMemberInputBody';
 export * from './UpdateOrgInputBody';
 export * from './VerifyEmailInputBody';
+export * from './VersionOutputBody';

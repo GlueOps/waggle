@@ -558,6 +558,13 @@ var generateTerraformOAGCmd = &cobra.Command{
 			return err
 		}
 
+		// Add 404 -> RemoveResource handling to all generated resource Read
+		// methods. Without this, a resource deleted outside Terraform causes
+		// a hard error on the next plan/apply instead of prompting recreation.
+		if err := patchResourceRead404(outDir); err != nil {
+			return err
+		}
+
 		// gofmt the provider package: the schema-role and registration patches
 		// emit loosely-spaced Go; gofmt normalizes alignment/indentation.
 		fmtProvider := exec.Command("gofmt", "-w", ".")
@@ -635,6 +642,9 @@ var resourceSchemaRoles = map[string]map[string]schemaRole{
 		"name":                 roleRequired,
 		"url":                  roleRequired,
 		"insecure_skip_verify": roleOptionalComputed,
+		// Optional+computed: omitting it keeps the server's 1.0 default rather
+		// than showing a perpetual diff against an unset attribute.
+		"cpu_overcommit_ratio": roleOptionalComputed,
 		"id":                   roleComputed,
 		"created_at":           roleComputed,
 		"updated_at":           roleComputed,
@@ -659,16 +669,20 @@ var resourceSchemaRoles = map[string]map[string]schemaRole{
 		"disk_gb_total":    roleRequired,
 		"disk_gb_reserved": roleRequired,
 		"schedulable":      roleOptionalComputed,
-		"cpu_used":         roleComputed,
-		"cpu_bookable":     roleComputed,
-		"ram_gb_used":      roleComputed,
-		"ram_gb_bookable":  roleComputed,
-		"disk_gb_used":     roleComputed,
-		"disk_gb_bookable": roleComputed,
-		"last_synced_at":   roleComputed,
-		"id":               roleComputed,
-		"created_at":       roleComputed,
-		"updated_at":       roleComputed,
+		// Optional+computed: omitting it inherits the datacenter's ratio, which
+		// the server fills in — a plain Optional would diff against that.
+		"cpu_overcommit_ratio": roleOptionalComputed,
+		"cpu_used":             roleComputed,
+		"cpu_effective_total":  roleComputed,
+		"cpu_bookable":         roleComputed,
+		"ram_gb_used":          roleComputed,
+		"ram_gb_bookable":      roleComputed,
+		"disk_gb_used":         roleComputed,
+		"disk_gb_bookable":     roleComputed,
+		"last_synced_at":       roleComputed,
+		"id":                   roleComputed,
+		"created_at":           roleComputed,
+		"updated_at":           roleComputed,
 	},
 	"pools": {
 		"name":          roleRequired,
@@ -1164,5 +1178,72 @@ func patchPoolsResourceUpdate(outDir string) error {
 		return fmt.Errorf("write %s: %w", file, err)
 	}
 	log.Printf("patched pools_resource.go: Update uses state.Id for PATCH URL")
+	return nil
+}
+
+// patchResourceRead404 adds 404 → RemoveResource handling to every generated
+// resource Read method. Without this, a resource deleted outside Terraform
+// causes a hard error on the next plan/apply instead of prompting recreation.
+// The fix uses isNotFound (defined in placements_resource.go, same package)
+// which detects the "API error ... 404" string emitted by DoRequest.
+//
+// Indentation: inside a function body the generator uses one tab; inside an
+// if block, two tabs. The matched block is:
+//
+//	\t\tresp.Diagnostics.AddError("Error reading X", err.Error())
+//	\t\treturn
+//	\t}
+//
+// The replacement prepends the isNotFound guard before the matched block so
+// the closing \t} of "if err != nil" is preserved.
+func patchResourceRead404(outDir string) error {
+	providerDir := filepath.Join(outDir, "internal", "provider")
+	// Matches the AddError+return+} block the generator emits inside Read.
+	// Two tabs before AddError/return (inside if err != nil), one tab for }.
+	re := regexp.MustCompile(
+		`\t\tresp\.Diagnostics\.AddError\("Error reading [^"]+", err\.Error\(\)\)\n\t\treturn\n\t\}`,
+	)
+	patched := 0
+	err := filepath.WalkDir(providerDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, "_resource.go") {
+			return nil
+		}
+		// placements_resource.go is a hand-authored overlay that already handles
+		// 404 correctly — skip it to avoid a double-injection.
+		if strings.HasSuffix(path, "placements_resource.go") {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+		s := string(b)
+		if !re.MatchString(s) {
+			return nil
+		}
+		// Prepend the isNotFound guard before the matched block.
+		// The \t} at the end of match closes the surrounding "if err != nil".
+		fixed := re.ReplaceAllStringFunc(s, func(match string) string {
+			return "\t\tif isNotFound(err) {\n\t\t\tresp.State.RemoveResource(ctx)\n\t\t\treturn\n\t\t}\n" + match
+		})
+		if fixed == s {
+			return nil
+		}
+		if err := os.WriteFile(path, []byte(fixed), 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", path, err)
+		}
+		log.Printf("patched %s: Read returns RemoveResource on 404", path)
+		patched++
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if patched == 0 {
+		log.Printf("note: no unpatched resource Read 404 handlers found under %s; skipping", providerDir)
+	}
 	return nil
 }

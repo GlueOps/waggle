@@ -1,21 +1,21 @@
 {
-  "name": "@glueops/waggle-sdk",
-  "version": "0.1.0",
-  "description": "OpenAPI client for @glueops/waggle-sdk",
   "author": "OpenAPI-Generator",
+  "description": "OpenAPI client for @glueops/waggle-sdk",
+  "devDependencies": {
+    "typescript": "^6.0.0"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/esm/index.js",
+  "name": "@glueops/waggle-sdk",
   "repository": {
     "type": "git",
     "url": "https://github.com/glueops/waggle.git"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "module": "./dist/esm/index.js",
-  "sideEffects": false,
   "scripts": {
-    "build": "tsc && tsc -p tsconfig.esm.json",
+    "build": "tsc \u0026\u0026 tsc -p tsconfig.esm.json",
     "prepare": "npm run build"
   },
-  "devDependencies": {
-    "typescript": "^6.0.0"
-  }
+  "sideEffects": false,
+  "types": "./dist/index.d.ts",
+  "version": "0.1.0"
 }

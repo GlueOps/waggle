@@ -85,8 +85,10 @@ All URIs are relative to */api/v1*
 *OrganizationsApi* | [**removeMember**](docs/OrganizationsApi.md#removemember) | **DELETE** /organizations/{id}/members/{userId} | Remove a member (admin+; owner required to remove owners; never the last owner).
 *OrganizationsApi* | [**updateMember**](docs/OrganizationsApi.md#updatemember) | **PATCH** /organizations/{id}/members/{userId} | Change a member\&#39;s role (admin+; owner required to touch owners).
 *OrganizationsApi* | [**updateOrg**](docs/OrganizationsApi.md#updateorg) | **PATCH** /organizations/{id} | Rename an organization (admin or owner).
-*PlacementApi* | [**backfillPlacementVmid**](docs/PlacementApi.md#backfillplacementvmid) | **PATCH** /placements/{id} | Attach the externally-assigned Proxmox vmid to a placement.
-*PlacementApi* | [**listPlacements**](docs/PlacementApi.md#listplacements) | **GET** /placements | List all placements in the tenant with pool, slot, and hypervisor context (fleet overview).
+*PlacementsApi* | [**backfillPlacementVmid**](docs/PlacementsApi.md#backfillplacementvmid) | **PATCH** /placements/{id} | Attach the externally-assigned Proxmox vmid to a placement.
+*PlacementsApi* | [**deletePlacement**](docs/PlacementsApi.md#deleteplacement) | **DELETE** /placements/{id} | Remove a placement. The pool\&#39;s desired_count is not adjusted; resize the pool to re-fill the vacancy.
+*PlacementsApi* | [**getPlacement**](docs/PlacementsApi.md#getplacement) | **GET** /placements/{id} | Fetch a single placement with its pool, hypervisor, and vmid.
+*PlacementsApi* | [**listPlacements**](docs/PlacementsApi.md#listplacements) | **GET** /placements | List all placements in the tenant with pool, slot, and hypervisor context (fleet overview).
 *PoolsApi* | [**createPool**](docs/PoolsApi.md#createpool) | **POST** /pools | Create a node pool and place its VMs across hypervisors (anti-affinity spread, all-or-nothing). Placements are available at GET /pools/{id}/placements.
 *PoolsApi* | [**deletePool**](docs/PoolsApi.md#deletepool) | **DELETE** /pools/{id} | Delete a pool and release all its placements.
 *PoolsApi* | [**getPool**](docs/PoolsApi.md#getpool) | **GET** /pools/{id} | Fetch a pool. Its placements are available at GET /pools/{id}/placements.
@@ -99,6 +101,7 @@ All URIs are relative to */api/v1*
 *SlotsApi* | [**listSlots**](docs/SlotsApi.md#listslots) | **GET** /slots | List slots in the caller\&#39;s tenant.
 *SlotsApi* | [**updateSlot**](docs/SlotsApi.md#updateslot) | **PUT** /slots/{id} | Update a slot.
 *SystemApi* | [**health**](docs/SystemApi.md#health) | **GET** /health | Health check
+*SystemApi* | [**version**](docs/SystemApi.md#version) | **GET** /version | Server version
 
 
 ### Models
@@ -154,6 +157,7 @@ All URIs are relative to */api/v1*
 - [UpdateMemberInputBody](docs/UpdateMemberInputBody.md)
 - [UpdateOrgInputBody](docs/UpdateOrgInputBody.md)
 - [VerifyEmailInputBody](docs/VerifyEmailInputBody.md)
+- [VersionOutputBody](docs/VersionOutputBody.md)
 
 ### Authorization
 

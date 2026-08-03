@@ -33,7 +33,15 @@ func (d *HypervisorsDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 		Attributes: map[string]schema.Attribute{
 			"cpu_bookable": schema.Int64Attribute{
 				Required:    true,
-				Description: "",
+				Description: "cpu_effective_total minus reserved, existing-guest, and Waggle-committed vCPU.",
+			},
+			"cpu_effective_total": schema.Int64Attribute{
+				Required:    true,
+				Description: "Schedulable vCPU pool: cpu_total x cpu_overcommit_ratio, rounded down.",
+			},
+			"cpu_overcommit_ratio": schema.Float64Attribute{
+				Required:    true,
+				Description: "vCPU sold per physical core on this node. 1.0 is no overcommit.",
 			},
 			"cpu_reserved": schema.Int64Attribute{
 				Required:    true,
@@ -41,7 +49,7 @@ func (d *HypervisorsDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 			},
 			"cpu_total": schema.Int64Attribute{
 				Required:    true,
-				Description: "",
+				Description: "Physical cores on the node.",
 			},
 			"cpu_used": schema.Int64Attribute{
 				Required:    true,

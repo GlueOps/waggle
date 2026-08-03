@@ -24,6 +24,7 @@ type datacenterView struct {
 	URL                string    `json:"url"`
 	HasToken           bool      `json:"has_token" doc:"Whether a Proxmox API token is configured (the token itself is never returned)."`
 	InsecureSkipVerify bool      `json:"insecure_skip_verify" doc:"Whether TLS verification is disabled for this cluster (self-signed certs)."`
+	CPUOvercommitRatio float64   `json:"cpu_overcommit_ratio" doc:"Default vCPU sold per physical core, stamped onto hypervisors as they are discovered here. 1.0 is no overcommit. Changing it does not re-rate existing hypervisors."`
 	CreatedAt          time.Time `json:"created_at" format:"date-time"`
 	UpdatedAt          time.Time `json:"updated_at" format:"date-time"`
 }
@@ -35,6 +36,7 @@ func toDatacenterView(d *tenant.Datacenter) datacenterView {
 		URL:                d.Url,
 		HasToken:           d.EncryptedTokenKey != "",
 		InsecureSkipVerify: d.InsecureSkipVerify,
+		CPUOvercommitRatio: d.EffectiveCPUOvercommitRatio(),
 		CreatedAt:          d.CreatedAt,
 		UpdatedAt:          d.UpdatedAt,
 	}
@@ -55,44 +57,52 @@ func toSlotView(s *tenant.Slot) slotView {
 }
 
 type hypervisorView struct {
-	ID             uuid.UUID  `json:"id"`
-	DatacenterID   uuid.UUID  `json:"datacenter_id"`
-	Name           string     `json:"name"`
-	CPUTotal       int        `json:"cpu_total"`
-	CPUReserved    int        `json:"cpu_reserved"`
-	CPUUsed        int        `json:"cpu_used" doc:"vCPU allocated to existing guests (from discovery)."`
-	CPUBookable    int        `json:"cpu_bookable"`
-	RAMGBTotal     int        `json:"ram_gb_total"`
-	RAMGBReserved  int        `json:"ram_gb_reserved"`
-	RAMGBUsed      int        `json:"ram_gb_used" doc:"RAM (GB) allocated to existing guests (from discovery)."`
-	RAMGBBookable  int        `json:"ram_gb_bookable"`
-	DiskGBTotal    int        `json:"disk_gb_total"`
-	DiskGBReserved int        `json:"disk_gb_reserved"`
-	DiskGBUsed     int        `json:"disk_gb_used" doc:"Disk (GB) allocated to existing guests (from discovery)."`
-	DiskGBBookable int        `json:"disk_gb_bookable"`
-	Schedulable    bool       `json:"schedulable" doc:"When false, placement excludes this hypervisor."`
-	LastSyncedAt   *time.Time `json:"last_synced_at,omitempty" format:"date-time"`
-	CreatedAt      time.Time  `json:"created_at" format:"date-time"`
-	UpdatedAt      time.Time  `json:"updated_at" format:"date-time"`
+	ID           uuid.UUID `json:"id"`
+	DatacenterID uuid.UUID `json:"datacenter_id"`
+	Name         string    `json:"name"`
+	CPUTotal     int       `json:"cpu_total" doc:"Physical cores on the node."`
+	CPUReserved  int       `json:"cpu_reserved"`
+	CPUUsed      int       `json:"cpu_used" doc:"vCPU allocated to existing guests (from discovery)."`
+	// CPUOvercommitRatio/CPUEffectiveTotal explain cpu_bookable: bookable is
+	// derived from the effective total (cores x ratio), not from cpu_total.
+	CPUOvercommitRatio float64    `json:"cpu_overcommit_ratio" doc:"vCPU sold per physical core on this node. 1.0 is no overcommit."`
+	CPUEffectiveTotal  int        `json:"cpu_effective_total" doc:"Schedulable vCPU pool: cpu_total x cpu_overcommit_ratio, rounded down."`
+	CPUBookable        int        `json:"cpu_bookable" doc:"cpu_effective_total minus reserved, existing-guest, and Waggle-committed vCPU."`
+	RAMGBTotal         int        `json:"ram_gb_total"`
+	RAMGBReserved      int        `json:"ram_gb_reserved"`
+	RAMGBUsed          int        `json:"ram_gb_used" doc:"RAM (GB) allocated to existing guests (from discovery)."`
+	RAMGBBookable      int        `json:"ram_gb_bookable"`
+	DiskGBTotal        int        `json:"disk_gb_total"`
+	DiskGBReserved     int        `json:"disk_gb_reserved"`
+	DiskGBUsed         int        `json:"disk_gb_used" doc:"Disk (GB) allocated to existing guests (from discovery)."`
+	DiskGBBookable     int        `json:"disk_gb_bookable"`
+	Schedulable        bool       `json:"schedulable" doc:"When false, placement excludes this hypervisor."`
+	LastSyncedAt       *time.Time `json:"last_synced_at,omitempty" format:"date-time"`
+	CreatedAt          time.Time  `json:"created_at" format:"date-time"`
+	UpdatedAt          time.Time  `json:"updated_at" format:"date-time"`
 }
 
 func toHypervisorView(h *tenant.Hypervisor) hypervisorView {
 	return hypervisorView{
-		ID:             h.ID,
-		DatacenterID:   h.DatacenterID,
-		Name:           h.Name,
-		CPUTotal:       h.CPUTotal,
-		CPUReserved:    h.CPUReserved,
-		CPUUsed:        h.CPUUsed,
-		CPUBookable:    h.CPUTotal - h.CPUReserved - h.CPUUsed,
+		ID:                 h.ID,
+		DatacenterID:       h.DatacenterID,
+		Name:               h.Name,
+		CPUTotal:           h.CPUTotal,
+		CPUReserved:        h.CPUReserved,
+		CPUUsed:            h.CPUUsed,
+		CPUOvercommitRatio: h.EffectiveCPUOvercommitRatio(),
+		CPUEffectiveTotal:  h.EffectiveCPUTotal(),
+		// Mirrors the scheduler's cpuRemaining in plan() — both start from the
+		// overcommitted total so the advertised figure is what will be booked.
+		CPUBookable:    h.EffectiveCPUTotal() - h.CPUReserved - h.CPUUsed - h.CPUConsumed,
 		RAMGBTotal:     h.RAMGBTotal,
 		RAMGBReserved:  h.RAMGBReserved,
 		RAMGBUsed:      h.RAMGBUsed,
-		RAMGBBookable:  h.RAMGBTotal - h.RAMGBReserved - h.RAMGBUsed,
+		RAMGBBookable:  h.RAMGBTotal - h.RAMGBReserved - h.RAMGBUsed - h.RAMGBConsumed,
 		DiskGBTotal:    h.DiskGBTotal,
 		DiskGBReserved: h.DiskGBReserved,
 		DiskGBUsed:     h.DiskGBUsed,
-		DiskGBBookable: h.DiskGBTotal - h.DiskGBReserved - h.DiskGBUsed,
+		DiskGBBookable: h.DiskGBTotal - h.DiskGBReserved - h.DiskGBUsed - h.DiskGBConsumed,
 		Schedulable:    h.Schedulable,
 		LastSyncedAt:   h.LastSyncedAt,
 		CreatedAt:      h.CreatedAt,
@@ -112,6 +122,10 @@ type datacenterBody struct {
 	// InsecureSkipVerify disables TLS verification for self-signed Proxmox
 	// clusters. Omit to default false (create) / leave unchanged (update).
 	InsecureSkipVerify *bool `json:"insecure_skip_verify,omitempty"`
+	// CPUOvercommitRatio is the default vCPU-per-physical-core ratio applied to
+	// hypervisors discovered in this datacenter. Omit to default 1.0 (create) /
+	// leave unchanged (update).
+	CPUOvercommitRatio *float64 `json:"cpu_overcommit_ratio,omitempty" exclusiveMinimum:"0" maximum:"64"`
 }
 
 // tokenPtr returns nil when no token was supplied so the service leaves any
@@ -187,6 +201,10 @@ type hypervisorBody struct {
 	DiskGBReserved int       `json:"disk_gb_reserved" minimum:"0"`
 	// Schedulable: omit to default true (create) / leave unchanged (update).
 	Schedulable *bool `json:"schedulable,omitempty"`
+	// CPUOvercommitRatio overrides the datacenter default for this node. Omit
+	// to inherit that default (create) / leave unchanged (update) — notably,
+	// moving a node to another datacenter does not re-rate it.
+	CPUOvercommitRatio *float64 `json:"cpu_overcommit_ratio,omitempty" exclusiveMinimum:"0" maximum:"64"`
 }
 
 type createHypervisorInput struct {
@@ -276,7 +294,7 @@ func (s *Server) registerTenant(fleet *service.FleetService, tokens *service.Tok
 		if err != nil {
 			return nil, err
 		}
-		dc, err := fleet.CreateDatacenter(ctx, orgID, service.DatacenterInput{Name: in.Body.Name, URL: in.Body.URL, Token: in.Body.tokenPtr(), InsecureSkipVerify: in.Body.InsecureSkipVerify})
+		dc, err := fleet.CreateDatacenter(ctx, orgID, service.DatacenterInput{Name: in.Body.Name, URL: in.Body.URL, Token: in.Body.tokenPtr(), InsecureSkipVerify: in.Body.InsecureSkipVerify, CPUOvercommitRatio: in.Body.CPUOvercommitRatio})
 		if err != nil {
 			return nil, mapFleetError(err)
 		}
@@ -332,7 +350,7 @@ func (s *Server) registerTenant(fleet *service.FleetService, tokens *service.Tok
 		if err != nil {
 			return nil, err
 		}
-		dc, err := fleet.UpdateDatacenter(ctx, orgID, in.ID, service.DatacenterInput{Name: in.Body.Name, URL: in.Body.URL, Token: in.Body.tokenPtr(), InsecureSkipVerify: in.Body.InsecureSkipVerify})
+		dc, err := fleet.UpdateDatacenter(ctx, orgID, in.ID, service.DatacenterInput{Name: in.Body.Name, URL: in.Body.URL, Token: in.Body.tokenPtr(), InsecureSkipVerify: in.Body.InsecureSkipVerify, CPUOvercommitRatio: in.Body.CPUOvercommitRatio})
 		if err != nil {
 			return nil, mapFleetError(err)
 		}
@@ -468,6 +486,8 @@ func (s *Server) registerTenant(fleet *service.FleetService, tokens *service.Tok
 			DiskGBTotal:    in.Body.DiskGBTotal,
 			DiskGBReserved: in.Body.DiskGBReserved,
 			Schedulable:    in.Body.Schedulable,
+
+			CPUOvercommitRatio: in.Body.CPUOvercommitRatio,
 		})
 		if err != nil {
 			return nil, mapFleetError(err)
@@ -542,6 +562,8 @@ func (s *Server) registerTenant(fleet *service.FleetService, tokens *service.Tok
 			DiskGBTotal:    in.Body.DiskGBTotal,
 			DiskGBReserved: in.Body.DiskGBReserved,
 			Schedulable:    in.Body.Schedulable,
+
+			CPUOvercommitRatio: in.Body.CPUOvercommitRatio,
 		})
 		if err != nil {
 			return nil, mapFleetError(err)

@@ -102,8 +102,10 @@ Class | Method | HTTP request | Description
 *OrganizationsAPI* | [**RemoveMember**](docs/OrganizationsAPI.md#removemember) | **Delete** /organizations/{id}/members/{userId} | Remove a member (admin+; owner required to remove owners; never the last owner).
 *OrganizationsAPI* | [**UpdateMember**](docs/OrganizationsAPI.md#updatemember) | **Patch** /organizations/{id}/members/{userId} | Change a member&#39;s role (admin+; owner required to touch owners).
 *OrganizationsAPI* | [**UpdateOrg**](docs/OrganizationsAPI.md#updateorg) | **Patch** /organizations/{id} | Rename an organization (admin or owner).
-*PlacementAPI* | [**BackfillPlacementVmid**](docs/PlacementAPI.md#backfillplacementvmid) | **Patch** /placements/{id} | Attach the externally-assigned Proxmox vmid to a placement.
-*PlacementAPI* | [**ListPlacements**](docs/PlacementAPI.md#listplacements) | **Get** /placements | List all placements in the tenant with pool, slot, and hypervisor context (fleet overview).
+*PlacementsAPI* | [**BackfillPlacementVmid**](docs/PlacementsAPI.md#backfillplacementvmid) | **Patch** /placements/{id} | Attach the externally-assigned Proxmox vmid to a placement.
+*PlacementsAPI* | [**DeletePlacement**](docs/PlacementsAPI.md#deleteplacement) | **Delete** /placements/{id} | Remove a placement. The pool&#39;s desired_count is not adjusted; resize the pool to re-fill the vacancy.
+*PlacementsAPI* | [**GetPlacement**](docs/PlacementsAPI.md#getplacement) | **Get** /placements/{id} | Fetch a single placement with its pool, hypervisor, and vmid.
+*PlacementsAPI* | [**ListPlacements**](docs/PlacementsAPI.md#listplacements) | **Get** /placements | List all placements in the tenant with pool, slot, and hypervisor context (fleet overview).
 *PoolsAPI* | [**CreatePool**](docs/PoolsAPI.md#createpool) | **Post** /pools | Create a node pool and place its VMs across hypervisors (anti-affinity spread, all-or-nothing). Placements are available at GET /pools/{id}/placements.
 *PoolsAPI* | [**DeletePool**](docs/PoolsAPI.md#deletepool) | **Delete** /pools/{id} | Delete a pool and release all its placements.
 *PoolsAPI* | [**GetPool**](docs/PoolsAPI.md#getpool) | **Get** /pools/{id} | Fetch a pool. Its placements are available at GET /pools/{id}/placements.
@@ -116,6 +118,7 @@ Class | Method | HTTP request | Description
 *SlotsAPI* | [**ListSlots**](docs/SlotsAPI.md#listslots) | **Get** /slots | List slots in the caller&#39;s tenant.
 *SlotsAPI* | [**UpdateSlot**](docs/SlotsAPI.md#updateslot) | **Put** /slots/{id} | Update a slot.
 *SystemAPI* | [**Health**](docs/SystemAPI.md#health) | **Get** /health | Health check
+*SystemAPI* | [**Version**](docs/SystemAPI.md#version) | **Get** /version | Server version
 
 
 ## Documentation For Models
@@ -171,6 +174,7 @@ Class | Method | HTTP request | Description
  - [UpdateMemberInputBody](docs/UpdateMemberInputBody.md)
  - [UpdateOrgInputBody](docs/UpdateOrgInputBody.md)
  - [VerifyEmailInputBody](docs/VerifyEmailInputBody.md)
+ - [VersionOutputBody](docs/VersionOutputBody.md)
 
 
 ## Documentation For Authorization

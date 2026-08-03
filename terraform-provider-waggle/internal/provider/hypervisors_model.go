@@ -9,25 +9,27 @@ import (
 
 // HypervisorsModel is the Terraform model for hypervisors.
 type HypervisorsModel struct {
-	CpuBookable    types.Int64  `tfsdk:"cpu_bookable"`
-	CpuReserved    types.Int64  `tfsdk:"cpu_reserved"`
-	CpuTotal       types.Int64  `tfsdk:"cpu_total"`
-	CpuUsed        types.Int64  `tfsdk:"cpu_used"`
-	CreatedAt      types.String `tfsdk:"created_at"`
-	DatacenterId   types.String `tfsdk:"datacenter_id"`
-	DiskGbBookable types.Int64  `tfsdk:"disk_gb_bookable"`
-	DiskGbReserved types.Int64  `tfsdk:"disk_gb_reserved"`
-	DiskGbTotal    types.Int64  `tfsdk:"disk_gb_total"`
-	DiskGbUsed     types.Int64  `tfsdk:"disk_gb_used"`
-	Id             types.String `tfsdk:"id"`
-	LastSyncedAt   types.String `tfsdk:"last_synced_at"`
-	Name           types.String `tfsdk:"name"`
-	RamGbBookable  types.Int64  `tfsdk:"ram_gb_bookable"`
-	RamGbReserved  types.Int64  `tfsdk:"ram_gb_reserved"`
-	RamGbTotal     types.Int64  `tfsdk:"ram_gb_total"`
-	RamGbUsed      types.Int64  `tfsdk:"ram_gb_used"`
-	Schedulable    types.Bool   `tfsdk:"schedulable"`
-	UpdatedAt      types.String `tfsdk:"updated_at"`
+	CpuBookable        types.Int64   `tfsdk:"cpu_bookable"`
+	CpuEffectiveTotal  types.Int64   `tfsdk:"cpu_effective_total"`
+	CpuOvercommitRatio types.Float64 `tfsdk:"cpu_overcommit_ratio"`
+	CpuReserved        types.Int64   `tfsdk:"cpu_reserved"`
+	CpuTotal           types.Int64   `tfsdk:"cpu_total"`
+	CpuUsed            types.Int64   `tfsdk:"cpu_used"`
+	CreatedAt          types.String  `tfsdk:"created_at"`
+	DatacenterId       types.String  `tfsdk:"datacenter_id"`
+	DiskGbBookable     types.Int64   `tfsdk:"disk_gb_bookable"`
+	DiskGbReserved     types.Int64   `tfsdk:"disk_gb_reserved"`
+	DiskGbTotal        types.Int64   `tfsdk:"disk_gb_total"`
+	DiskGbUsed         types.Int64   `tfsdk:"disk_gb_used"`
+	Id                 types.String  `tfsdk:"id"`
+	LastSyncedAt       types.String  `tfsdk:"last_synced_at"`
+	Name               types.String  `tfsdk:"name"`
+	RamGbBookable      types.Int64   `tfsdk:"ram_gb_bookable"`
+	RamGbReserved      types.Int64   `tfsdk:"ram_gb_reserved"`
+	RamGbTotal         types.Int64   `tfsdk:"ram_gb_total"`
+	RamGbUsed          types.Int64   `tfsdk:"ram_gb_used"`
+	Schedulable        types.Bool    `tfsdk:"schedulable"`
+	UpdatedAt          types.String  `tfsdk:"updated_at"`
 }
 
 // ToClientModel converts a Terraform model to a client model.
@@ -35,6 +37,12 @@ func (m *HypervisorsModel) ToClientModel() *client.HypervisorView {
 	out := &client.HypervisorView{}
 	if !m.CpuBookable.IsNull() && !m.CpuBookable.IsUnknown() {
 		out.CpuBookable = int64(m.CpuBookable.ValueInt64())
+	}
+	if !m.CpuEffectiveTotal.IsNull() && !m.CpuEffectiveTotal.IsUnknown() {
+		out.CpuEffectiveTotal = int64(m.CpuEffectiveTotal.ValueInt64())
+	}
+	if !m.CpuOvercommitRatio.IsNull() && !m.CpuOvercommitRatio.IsUnknown() {
+		out.CpuOvercommitRatio = float64(m.CpuOvercommitRatio.ValueFloat64())
 	}
 	if !m.CpuReserved.IsNull() && !m.CpuReserved.IsUnknown() {
 		out.CpuReserved = int64(m.CpuReserved.ValueInt64())
@@ -96,6 +104,8 @@ func (m *HypervisorsModel) ToClientModel() *client.HypervisorView {
 // FromClientModel updates the Terraform model from a client model.
 func (m *HypervisorsModel) FromClientModel(c *client.HypervisorView) {
 	m.CpuBookable = types.Int64Value(int64(c.CpuBookable))
+	m.CpuEffectiveTotal = types.Int64Value(int64(c.CpuEffectiveTotal))
+	m.CpuOvercommitRatio = types.Float64Value(float64(c.CpuOvercommitRatio))
 	m.CpuReserved = types.Int64Value(int64(c.CpuReserved))
 	m.CpuTotal = types.Int64Value(int64(c.CpuTotal))
 	m.CpuUsed = types.Int64Value(int64(c.CpuUsed))

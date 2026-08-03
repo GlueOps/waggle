@@ -151,6 +151,7 @@ type NodeUsage struct {
 
 // guestRow is the shared shape of /qemu and /lxc list entries we sum over.
 type guestRow struct {
+	VMID    int   `json:"vmid"`
 	CPUs    int   `json:"cpus"`
 	MaxMem  int64 `json:"maxmem"`
 	MaxDisk int64 `json:"maxdisk"`
@@ -159,7 +160,13 @@ type guestRow struct {
 // NodeUsage sums allocated resources across a node's QEMU VMs and LXC
 // containers. A guest endpoint that errors (e.g. permissions) contributes
 // nothing rather than failing the whole discovery.
-func (c *Client) NodeUsage(ctx context.Context, node string) (NodeUsage, error) {
+//
+// Guests whose vmid is in exclude are skipped: those are VMs Waggle already
+// accounts for via its placement ledger, so counting them here too would
+// double-subtract their capacity at scheduling time. A nil exclude counts
+// every guest. vmid is cluster-unique in Proxmox, so a flat set suffices —
+// no per-node keying is needed.
+func (c *Client) NodeUsage(ctx context.Context, node string, exclude map[int]struct{}) (NodeUsage, error) {
 	var usage NodeUsage
 	for _, kind := range []string{"qemu", "lxc"} {
 		var payload struct {
@@ -170,6 +177,9 @@ func (c *Client) NodeUsage(ctx context.Context, node string) (NodeUsage, error) 
 			continue
 		}
 		for _, g := range payload.Data {
+			if _, managed := exclude[g.VMID]; managed {
+				continue
+			}
 			usage.VCPU += g.CPUs
 			usage.MemBytes += g.MaxMem
 			usage.DiskBytes += g.MaxDisk

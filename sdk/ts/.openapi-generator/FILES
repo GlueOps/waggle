@@ -42,9 +42,9 @@ docs/OrgFullView.md
 docs/OrgListOutputBody.md
 docs/OrgView.md
 docs/OrganizationsApi.md
-docs/PlacementApi.md
 docs/PlacementListOutputBody.md
 docs/PlacementView.md
+docs/PlacementsApi.md
 docs/PoolListOutputBody.md
 docs/PoolView.md
 docs/PoolsApi.md
@@ -62,13 +62,14 @@ docs/SystemApi.md
 docs/UpdateMemberInputBody.md
 docs/UpdateOrgInputBody.md
 docs/VerifyEmailInputBody.md
+docs/VersionOutputBody.md
 package.json
 src/apis/ApiKeysApi.ts
 src/apis/AuthApi.ts
 src/apis/DatacentersApi.ts
 src/apis/HypervisorsApi.ts
 src/apis/OrganizationsApi.ts
-src/apis/PlacementApi.ts
+src/apis/PlacementsApi.ts
 src/apis/PoolsApi.ts
 src/apis/SlotsApi.ts
 src/apis/SystemApi.ts
@@ -125,6 +126,7 @@ src/models/SwitchOrgInputBody.ts
 src/models/UpdateMemberInputBody.ts
 src/models/UpdateOrgInputBody.ts
 src/models/VerifyEmailInputBody.ts
+src/models/VersionOutputBody.ts
 src/models/index.ts
 src/runtime.ts
 tsconfig.esm.json

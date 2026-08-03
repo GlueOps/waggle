@@ -28,6 +28,7 @@ type PlacementView struct {
 	HypervisorId   string    `json:"hypervisor_id"`
 	HypervisorName string    `json:"hypervisor_name"`
 	Id             string    `json:"id"`
+	PoolId         string    `json:"pool_id"`
 	Vmid           *int64    `json:"vmid,omitempty"`
 }
 
@@ -37,12 +38,13 @@ type _PlacementView PlacementView
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewPlacementView(createdAt time.Time, hypervisorId string, hypervisorName string, id string) *PlacementView {
+func NewPlacementView(createdAt time.Time, hypervisorId string, hypervisorName string, id string, poolId string) *PlacementView {
 	this := PlacementView{}
 	this.CreatedAt = createdAt
 	this.HypervisorId = hypervisorId
 	this.HypervisorName = hypervisorName
 	this.Id = id
+	this.PoolId = poolId
 	return &this
 }
 
@@ -182,6 +184,30 @@ func (o *PlacementView) SetId(v string) {
 	o.Id = v
 }
 
+// GetPoolId returns the PoolId field value
+func (o *PlacementView) GetPoolId() string {
+	if o == nil {
+		var ret string
+		return ret
+	}
+
+	return o.PoolId
+}
+
+// GetPoolIdOk returns a tuple with the PoolId field value
+// and a boolean to check if the value has been set.
+func (o *PlacementView) GetPoolIdOk() (*string, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.PoolId, true
+}
+
+// SetPoolId sets field value
+func (o *PlacementView) SetPoolId(v string) {
+	o.PoolId = v
+}
+
 // GetVmid returns the Vmid field value if set, zero value otherwise.
 func (o *PlacementView) GetVmid() int64 {
 	if o == nil || IsNil(o.Vmid) {
@@ -231,6 +257,7 @@ func (o PlacementView) ToMap() (map[string]interface{}, error) {
 	toSerialize["hypervisor_id"] = o.HypervisorId
 	toSerialize["hypervisor_name"] = o.HypervisorName
 	toSerialize["id"] = o.Id
+	toSerialize["pool_id"] = o.PoolId
 	if !IsNil(o.Vmid) {
 		toSerialize["vmid"] = o.Vmid
 	}
@@ -246,6 +273,7 @@ func (o *PlacementView) UnmarshalJSON(data []byte) (err error) {
 		"hypervisor_id",
 		"hypervisor_name",
 		"id",
+		"pool_id",
 	}
 
 	allProperties := make(map[string]interface{})

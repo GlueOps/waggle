@@ -25,6 +25,9 @@ import { RowActions } from "@/components/crud/row-actions"
 import { PageShell } from "@/components/crud/page-shell"
 import { errMsg } from "@/lib/errors"
 
+// Mirrors service.MaxCPUOvercommitRatio on the server.
+const MAX_OVERCOMMIT = 64
+
 function bodyFor(hv: HypervisorView, overrides: Partial<HypervisorView>) {
   const m = { ...hv, ...overrides }
   return {
@@ -37,6 +40,7 @@ function bodyFor(hv: HypervisorView, overrides: Partial<HypervisorView>) {
     disk_gb_total: m.disk_gb_total,
     disk_gb_reserved: m.disk_gb_reserved,
     schedulable: m.schedulable,
+    cpu_overcommit_ratio: m.cpu_overcommit_ratio,
   }
 }
 
@@ -45,6 +49,7 @@ export function HypervisorsPage() {
   const list = useQuery(listHypervisorsOptions())
   const [editing, setEditing] = useState<HypervisorView | null>(null)
   const [reserved, setReserved] = useState({ cpu: 0, ram: 0, disk: 0 })
+  const [overcommit, setOvercommit] = useState("1")
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -64,6 +69,7 @@ export function HypervisorsPage() {
 
   function openEdit(hv: HypervisorView) {
     setReserved({ cpu: hv.cpu_reserved, ram: hv.ram_gb_reserved, disk: hv.disk_gb_reserved })
+    setOvercommit(String(hv.cpu_overcommit_ratio))
     setError(null)
     setEditing(hv)
   }
@@ -71,12 +77,19 @@ export function HypervisorsPage() {
   async function saveReserved() {
     if (!editing) return
     setError(null)
+    // Mirror the server's bounds so a typo is caught before a round trip.
+    const ratio = Number(overcommit)
+    if (!Number.isFinite(ratio) || ratio <= 0 || ratio > MAX_OVERCOMMIT) {
+      setError(`CPU overcommit must be greater than 0 and at most ${MAX_OVERCOMMIT}.`)
+      return
+    }
     try {
       await updateMut.mutateAsync({
         body: bodyFor(editing, {
           cpu_reserved: reserved.cpu,
           ram_gb_reserved: reserved.ram,
           disk_gb_reserved: reserved.disk,
+          cpu_overcommit_ratio: ratio,
         }),
         path: { id: editing.id },
       })
@@ -126,7 +139,20 @@ export function HypervisorsPage() {
           {items.map((hv) => (
             <TableRow key={hv.id}>
               <TableCell className="font-medium">{hv.name}</TableCell>
-              <TableCell>{hv.cpu_bookable}/{hv.cpu_total}</TableCell>
+              {/* Free is measured against the EFFECTIVE total (cores x ratio),
+                  not physical cores — otherwise an oversold node reads as
+                  "108/32". The ratio is shown only when it is doing something. */}
+              <TableCell>
+                {hv.cpu_bookable}/{hv.cpu_effective_total}
+                {hv.cpu_overcommit_ratio !== 1 && (
+                  <span
+                    className="ml-2 text-xs text-muted-foreground"
+                    title={`${hv.cpu_total} physical cores oversold ${hv.cpu_overcommit_ratio}:1`}
+                  >
+                    {hv.cpu_overcommit_ratio}x
+                  </span>
+                )}
+              </TableCell>
               <TableCell>{hv.ram_gb_bookable}/{hv.ram_gb_total}</TableCell>
               <TableCell>{hv.disk_gb_bookable}/{hv.disk_gb_total}</TableCell>
               <TableCell>
@@ -139,7 +165,7 @@ export function HypervisorsPage() {
               <TableCell>
                 <RowActions
                   actions={[
-                    { label: "Edit reserved", onSelect: () => openEdit(hv) },
+                    { label: "Edit capacity", onSelect: () => openEdit(hv) },
                     { label: "Delete", variant: "destructive", onSelect: () => void remove(hv) },
                   ]}
                 />
@@ -152,8 +178,8 @@ export function HypervisorsPage() {
       <FormDialog
         open={editing !== null}
         onOpenChange={(o) => !o && setEditing(null)}
-        title={`Reserved capacity — ${editing?.name ?? ""}`}
-        description="Reserved capacity is held back from placement (e.g. for host overhead)."
+        title={`Capacity — ${editing?.name ?? ""}`}
+        description="Reserved capacity is held back from placement (e.g. for host overhead). CPU overcommit sets how many vCPU are sold per physical core."
         onSubmit={() => void saveReserved()}
         submitting={updateMut.isPending}
         error={error}
@@ -189,6 +215,23 @@ export function HypervisorsPage() {
               onChange={(e) => setReserved({ ...reserved, disk: num(e.target.value) })}
             />
           </div>
+        </div>
+        <div className="mt-3 flex flex-col gap-2">
+          <Label htmlFor="hv-overcommit">CPU overcommit (vCPU per core)</Label>
+          <Input
+            id="hv-overcommit"
+            type="number"
+            step="0.1"
+            min={0}
+            max={MAX_OVERCOMMIT}
+            value={overcommit}
+            onChange={(e) => setOvercommit(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            1 sells cores 1:1. {editing ? `At ${overcommit || 0}x this node offers ` +
+              `${Math.floor(editing.cpu_total * (Number(overcommit) || 0))} vCPU from ` +
+              `${editing.cpu_total} cores.` : ""}
+          </p>
         </div>
       </FormDialog>
     </PageShell>

@@ -39,10 +39,18 @@ export interface BackfillPlacementVmidRequest {
     backfillVMIDInputBody: Omit<BackfillVMIDInputBody, '$schema'>;
 }
 
+export interface DeletePlacementRequest {
+    id: string;
+}
+
+export interface GetPlacementRequest {
+    id: string;
+}
+
 /**
  * 
  */
-export class PlacementApi extends runtime.BaseAPI {
+export class PlacementsApi extends runtime.BaseAPI {
 
     /**
      * Creates request options for backfillPlacementVmid without sending the request
@@ -104,6 +112,111 @@ export class PlacementApi extends runtime.BaseAPI {
      */
     async backfillPlacementVmid(requestParameters: BackfillPlacementVmidRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PlacementView> {
         const response = await this.backfillPlacementVmidRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Creates request options for deletePlacement without sending the request
+     */
+    async deletePlacementRequestOpts(requestParameters: DeletePlacementRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling deletePlacement().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearer", []);
+
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
+
+        let urlPath = `/placements/{id}`;
+        urlPath = urlPath.replace('{id}', encodeURIComponent(String(requestParameters['id'])));
+
+        return {
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Remove a placement. The pool\'s desired_count is not adjusted; resize the pool to re-fill the vacancy.
+     */
+    async deletePlacementRaw(requestParameters: DeletePlacementRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        const requestOptions = await this.deletePlacementRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Remove a placement. The pool\'s desired_count is not adjusted; resize the pool to re-fill the vacancy.
+     */
+    async deletePlacement(requestParameters: DeletePlacementRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deletePlacementRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Creates request options for getPlacement without sending the request
+     */
+    async getPlacementRequestOpts(requestParameters: GetPlacementRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling getPlacement().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearer", []);
+
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
+
+        let urlPath = `/placements/{id}`;
+        urlPath = urlPath.replace('{id}', encodeURIComponent(String(requestParameters['id'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Fetch a single placement with its pool, hypervisor, and vmid.
+     */
+    async getPlacementRaw(requestParameters: GetPlacementRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PlacementView>> {
+        const requestOptions = await this.getPlacementRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PlacementViewFromJSON(jsonValue));
+    }
+
+    /**
+     * Fetch a single placement with its pool, hypervisor, and vmid.
+     */
+    async getPlacement(requestParameters: GetPlacementRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PlacementView> {
+        const response = await this.getPlacementRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

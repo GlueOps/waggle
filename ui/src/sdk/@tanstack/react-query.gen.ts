@@ -3,8 +3,8 @@
 import { queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addMember, authAcceptInvite, authLogin, authLogout, authMe, authRefresh, authSignup, authSwitchOrg, authVerifyEmail, backfillPlacementVmid, createApiKey, createDatacenter, createHypervisor, createOrg, createPool, createSlot, deleteDatacenter, deleteHypervisor, deletePlacement, deleteOrg, deletePool, deleteSlot, discoverHypervisors, getDatacenter, getHypervisor, getOrg, getPlacement, getPool, getSlot, health, listApiKeys, listDatacenters, listHypervisors, listMembers, listOrgs, listPlacements, listPoolPlacements, listPools, listSlots, type Options, removeMember, resizePool, revokeApiKey, updateDatacenter, updateHypervisor, updateMember, updateOrg, updateSlot } from '../sdk.gen';
-import type { AddMemberData, AddMemberError, AddMemberResponse, AuthAcceptInviteData, AuthAcceptInviteError, AuthAcceptInviteResponse, AuthLoginData, AuthLoginError, AuthLoginResponse, AuthLogoutData, AuthLogoutError, AuthLogoutResponse, AuthMeData, AuthMeError, AuthMeResponse, AuthRefreshData, AuthRefreshError, AuthRefreshResponse, AuthSignupData, AuthSignupError, AuthSignupResponse, AuthSwitchOrgData, AuthSwitchOrgError, AuthSwitchOrgResponse, AuthVerifyEmailData, AuthVerifyEmailError, AuthVerifyEmailResponse, BackfillPlacementVmidData, BackfillPlacementVmidError, BackfillPlacementVmidResponse, CreateApiKeyData, CreateApiKeyError, CreateApiKeyResponse, CreateDatacenterData, CreateDatacenterError, CreateDatacenterResponse, CreateHypervisorData, CreateHypervisorError, CreateHypervisorResponse, CreateOrgData, CreateOrgError, CreateOrgResponse, CreatePoolData, CreatePoolError, CreatePoolResponse, CreateSlotData, CreateSlotError, CreateSlotResponse, DeleteDatacenterData, DeleteDatacenterError, DeleteDatacenterResponse, DeleteHypervisorData, DeleteHypervisorError, DeleteHypervisorResponse, DeleteOrgData, DeleteOrgError, DeleteOrgResponse, DeletePlacementData, DeletePlacementError, DeletePlacementResponse, DeletePoolData, DeletePoolError, DeletePoolResponse, DeleteSlotData, DeleteSlotError, DeleteSlotResponse, DiscoverHypervisorsData, DiscoverHypervisorsError, DiscoverHypervisorsResponse, GetDatacenterData, GetDatacenterError, GetDatacenterResponse, GetHypervisorData, GetHypervisorError, GetHypervisorResponse, GetOrgData, GetOrgError, GetOrgResponse, GetPlacementData, GetPlacementError, GetPlacementResponse, GetPoolData, GetPoolError, GetPoolResponse, GetSlotData, GetSlotError, GetSlotResponse, HealthData, HealthError, HealthResponse, ListApiKeysData, ListApiKeysError, ListApiKeysResponse, ListDatacentersData, ListDatacentersError, ListDatacentersResponse, ListHypervisorsData, ListHypervisorsError, ListHypervisorsResponse, ListMembersData, ListMembersError, ListMembersResponse, ListOrgsData, ListOrgsError, ListOrgsResponse, ListPlacementsData, ListPlacementsError, ListPlacementsResponse, ListPoolPlacementsData, ListPoolPlacementsError, ListPoolPlacementsResponse, ListPoolsData, ListPoolsError, ListPoolsResponse, ListSlotsData, ListSlotsError, ListSlotsResponse, RemoveMemberData, RemoveMemberError, RemoveMemberResponse, ResizePoolData, ResizePoolError, ResizePoolResponse, RevokeApiKeyData, RevokeApiKeyError, RevokeApiKeyResponse, UpdateDatacenterData, UpdateDatacenterError, UpdateDatacenterResponse, UpdateHypervisorData, UpdateHypervisorError, UpdateHypervisorResponse, UpdateMemberData, UpdateMemberError, UpdateMemberResponse, UpdateOrgData, UpdateOrgError, UpdateOrgResponse, UpdateSlotData, UpdateSlotError, UpdateSlotResponse } from '../types.gen';
+import { addMember, authAcceptInvite, authLogin, authLogout, authMe, authRefresh, authSignup, authSwitchOrg, authVerifyEmail, backfillPlacementVmid, createApiKey, createDatacenter, createHypervisor, createOrg, createPool, createSlot, deleteDatacenter, deleteHypervisor, deleteOrg, deletePlacement, deletePool, deleteSlot, discoverHypervisors, getDatacenter, getHypervisor, getOrg, getPlacement, getPool, getSlot, health, listApiKeys, listDatacenters, listHypervisors, listMembers, listOrgs, listPlacements, listPoolPlacements, listPools, listSlots, type Options, removeMember, resizePool, revokeApiKey, updateDatacenter, updateHypervisor, updateMember, updateOrg, updateSlot, version } from '../sdk.gen';
+import type { AddMemberData, AddMemberError, AddMemberResponse, AuthAcceptInviteData, AuthAcceptInviteError, AuthAcceptInviteResponse, AuthLoginData, AuthLoginError, AuthLoginResponse, AuthLogoutData, AuthLogoutError, AuthLogoutResponse, AuthMeData, AuthMeError, AuthMeResponse, AuthRefreshData, AuthRefreshError, AuthRefreshResponse, AuthSignupData, AuthSignupError, AuthSignupResponse, AuthSwitchOrgData, AuthSwitchOrgError, AuthSwitchOrgResponse, AuthVerifyEmailData, AuthVerifyEmailError, AuthVerifyEmailResponse, BackfillPlacementVmidData, BackfillPlacementVmidError, BackfillPlacementVmidResponse, CreateApiKeyData, CreateApiKeyError, CreateApiKeyResponse, CreateDatacenterData, CreateDatacenterError, CreateDatacenterResponse, CreateHypervisorData, CreateHypervisorError, CreateHypervisorResponse, CreateOrgData, CreateOrgError, CreateOrgResponse, CreatePoolData, CreatePoolError, CreatePoolResponse, CreateSlotData, CreateSlotError, CreateSlotResponse, DeleteDatacenterData, DeleteDatacenterError, DeleteDatacenterResponse, DeleteHypervisorData, DeleteHypervisorError, DeleteHypervisorResponse, DeleteOrgData, DeleteOrgError, DeleteOrgResponse, DeletePlacementData, DeletePlacementError, DeletePlacementResponse, DeletePoolData, DeletePoolError, DeletePoolResponse, DeleteSlotData, DeleteSlotError, DeleteSlotResponse, DiscoverHypervisorsData, DiscoverHypervisorsError, DiscoverHypervisorsResponse, GetDatacenterData, GetDatacenterError, GetDatacenterResponse, GetHypervisorData, GetHypervisorError, GetHypervisorResponse, GetOrgData, GetOrgError, GetOrgResponse, GetPlacementData, GetPlacementError, GetPlacementResponse, GetPoolData, GetPoolError, GetPoolResponse, GetSlotData, GetSlotError, GetSlotResponse, HealthData, HealthError, HealthResponse, ListApiKeysData, ListApiKeysError, ListApiKeysResponse, ListDatacentersData, ListDatacentersError, ListDatacentersResponse, ListHypervisorsData, ListHypervisorsError, ListHypervisorsResponse, ListMembersData, ListMembersError, ListMembersResponse, ListOrgsData, ListOrgsError, ListOrgsResponse, ListPlacementsData, ListPlacementsError, ListPlacementsResponse, ListPoolPlacementsData, ListPoolPlacementsError, ListPoolPlacementsResponse, ListPoolsData, ListPoolsError, ListPoolsResponse, ListSlotsData, ListSlotsError, ListSlotsResponse, RemoveMemberData, RemoveMemberError, RemoveMemberResponse, ResizePoolData, ResizePoolError, ResizePoolResponse, RevokeApiKeyData, RevokeApiKeyError, RevokeApiKeyResponse, UpdateDatacenterData, UpdateDatacenterError, UpdateDatacenterResponse, UpdateHypervisorData, UpdateHypervisorError, UpdateHypervisorResponse, UpdateMemberData, UpdateMemberError, UpdateMemberResponse, UpdateOrgData, UpdateOrgError, UpdateOrgResponse, UpdateSlotData, UpdateSlotError, UpdateSlotResponse, VersionData, VersionError, VersionResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -612,12 +612,12 @@ export const listPlacementsOptions = (options?: Options<ListPlacementsData>) => 
 });
 
 /**
- * Attach the externally-assigned Proxmox vmid to a placement.
+ * Remove a placement. The pool's desired_count is not adjusted; resize the pool to re-fill the vacancy.
  */
-export const backfillPlacementVmidMutation = (options?: Partial<Options<BackfillPlacementVmidData>>): UseMutationOptions<BackfillPlacementVmidResponse, BackfillPlacementVmidError, Options<BackfillPlacementVmidData>> => {
-    const mutationOptions: UseMutationOptions<BackfillPlacementVmidResponse, BackfillPlacementVmidError, Options<BackfillPlacementVmidData>> = {
+export const deletePlacementMutation = (options?: Partial<Options<DeletePlacementData>>): UseMutationOptions<DeletePlacementResponse, DeletePlacementError, Options<DeletePlacementData>> => {
+    const mutationOptions: UseMutationOptions<DeletePlacementResponse, DeletePlacementError, Options<DeletePlacementData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await backfillPlacementVmid({
+            const { data } = await deletePlacement({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -631,7 +631,7 @@ export const backfillPlacementVmidMutation = (options?: Partial<Options<Backfill
 export const getPlacementQueryKey = (options: Options<GetPlacementData>) => createQueryKey('getPlacement', options);
 
 /**
- * Fetch a single placement by ID.
+ * Fetch a single placement with its pool, hypervisor, and vmid.
  */
 export const getPlacementOptions = (options: Options<GetPlacementData>) => queryOptions<GetPlacementResponse, GetPlacementError, GetPlacementResponse, ReturnType<typeof getPlacementQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -647,12 +647,12 @@ export const getPlacementOptions = (options: Options<GetPlacementData>) => query
 });
 
 /**
- * Remove a placement from waggle. The pool's desired_count is not adjusted.
+ * Attach the externally-assigned Proxmox vmid to a placement.
  */
-export const deletePlacementMutation = (options?: Partial<Options<DeletePlacementData>>): UseMutationOptions<DeletePlacementResponse, DeletePlacementError, Options<DeletePlacementData>> => {
-    const mutationOptions: UseMutationOptions<DeletePlacementResponse, DeletePlacementError, Options<DeletePlacementData>> = {
+export const backfillPlacementVmidMutation = (options?: Partial<Options<BackfillPlacementVmidData>>): UseMutationOptions<BackfillPlacementVmidResponse, BackfillPlacementVmidError, Options<BackfillPlacementVmidData>> => {
+    const mutationOptions: UseMutationOptions<BackfillPlacementVmidResponse, BackfillPlacementVmidError, Options<BackfillPlacementVmidData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await deletePlacement({
+            const { data } = await backfillPlacementVmid({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -854,3 +854,21 @@ export const updateSlotMutation = (options?: Partial<Options<UpdateSlotData>>): 
     };
     return mutationOptions;
 };
+
+export const versionQueryKey = (options?: Options<VersionData>) => createQueryKey('version', options);
+
+/**
+ * Server version
+ */
+export const versionOptions = (options?: Options<VersionData>) => queryOptions<VersionResponse, VersionError, VersionResponse, ReturnType<typeof versionQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await version({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: versionQueryKey(options)
+});

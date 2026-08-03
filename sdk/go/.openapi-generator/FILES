@@ -8,7 +8,7 @@ api_auth.go
 api_datacenters.go
 api_hypervisors.go
 api_organizations.go
-api_placement.go
+api_placements.go
 api_pools.go
 api_slots.go
 api_system.go
@@ -54,9 +54,9 @@ docs/OrgFullView.md
 docs/OrgListOutputBody.md
 docs/OrgView.md
 docs/OrganizationsAPI.md
-docs/PlacementAPI.md
 docs/PlacementListOutputBody.md
 docs/PlacementView.md
+docs/PlacementsAPI.md
 docs/PoolListOutputBody.md
 docs/PoolView.md
 docs/PoolsAPI.md
@@ -74,6 +74,7 @@ docs/SystemAPI.md
 docs/UpdateMemberInputBody.md
 docs/UpdateOrgInputBody.md
 docs/VerifyEmailInputBody.md
+docs/VersionOutputBody.md
 git_push.sh
 go.mod
 go.sum
@@ -128,13 +129,14 @@ model_switch_org_input_body.go
 model_update_member_input_body.go
 model_update_org_input_body.go
 model_verify_email_input_body.go
+model_version_output_body.go
 response.go
 test/api_api_keys_test.go
 test/api_auth_test.go
 test/api_datacenters_test.go
 test/api_hypervisors_test.go
 test/api_organizations_test.go
-test/api_placement_test.go
+test/api_placements_test.go
 test/api_pools_test.go
 test/api_slots_test.go
 test/api_system_test.go
