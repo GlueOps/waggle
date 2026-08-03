@@ -19,6 +19,22 @@ build: ui
 release: ui
     goreleaser build --snapshot --clean
 
+# Cut a release: bump VERSION, regenerate the spec/SDKs so they carry the new
+# number, then tag. Order matters -- the artifacts must be committed BEFORE the
+# tag, or the tagged tree ships a spec claiming the previous version.
+# Usage: just release-prep 0.2.1
+release-prep version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "{{version}}" > VERSION
+    just sdk
+    just terraform
+    echo
+    echo "VERSION is now {{version}} and artifacts are regenerated."
+    echo "Next: review the diff, commit, merge to main, then tag on the merge commit:"
+    echo "    git tag v{{version}} && git push origin v{{version}}"
+    echo "The Docker Publish workflow verifies the tag matches VERSION."
+
 up:
   docker-compose up -d
   migrate up

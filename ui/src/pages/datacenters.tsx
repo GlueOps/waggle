@@ -33,6 +33,9 @@ import { errMsg } from "@/lib/errors"
 
 type Editing = { mode: "create" } | { mode: "edit"; dc: DatacenterView } | null
 
+// Mirrors service.MaxCPUOvercommitRatio on the server.
+const MAX_OVERCOMMIT = 64
+
 export function DatacentersPage() {
   const qc = useQueryClient()
   const list = useQuery(listDatacentersOptions())
@@ -41,6 +44,7 @@ export function DatacentersPage() {
   const [url, setUrl] = useState("")
   const [token, setToken] = useState("")
   const [insecure, setInsecure] = useState(false)
+  const [overcommit, setOvercommit] = useState("1")
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -57,6 +61,7 @@ export function DatacentersPage() {
     setUrl("")
     setToken("")
     setInsecure(false)
+    setOvercommit("1")
     setError(null)
     setEditing({ mode: "create" })
   }
@@ -65,13 +70,26 @@ export function DatacentersPage() {
     setUrl(dc.url)
     setToken("")
     setInsecure(dc.insecure_skip_verify)
+    setOvercommit(String(dc.cpu_overcommit_ratio))
     setError(null)
     setEditing({ mode: "edit", dc })
   }
 
   async function save() {
     setError(null)
-    const body = { name, url, insecure_skip_verify: insecure, ...(token ? { token } : {}) }
+    // Mirror the server's bounds so a typo is caught before a round trip.
+    const ratio = Number(overcommit)
+    if (!Number.isFinite(ratio) || ratio <= 0 || ratio > MAX_OVERCOMMIT) {
+      setError(`CPU overcommit must be greater than 0 and at most ${MAX_OVERCOMMIT}.`)
+      return
+    }
+    const body = {
+      name,
+      url,
+      insecure_skip_verify: insecure,
+      cpu_overcommit_ratio: ratio,
+      ...(token ? { token } : {}),
+    }
     try {
       if (editing?.mode === "edit") {
         await updateMut.mutateAsync({ body, path: { id: editing.dc.id } })
@@ -214,6 +232,22 @@ export function DatacentersPage() {
             </p>
           </div>
           <Switch id="dc-insecure" checked={insecure} onCheckedChange={setInsecure} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="dc-overcommit">Default CPU overcommit (vCPU per core)</Label>
+          <Input
+            id="dc-overcommit"
+            type="number"
+            step="0.1"
+            min={0}
+            max={MAX_OVERCOMMIT}
+            value={overcommit}
+            onChange={(e) => setOvercommit(e.target.value)}
+          />
+          <p className="text-muted-foreground text-xs">
+            Stamped onto hypervisors as they are discovered here. 1 sells cores 1:1.
+            Changing it does not re-rate hypervisors that already exist.
+          </p>
         </div>
       </FormDialog>
     </PageShell>

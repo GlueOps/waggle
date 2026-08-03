@@ -35,6 +35,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
+      # The VERSION file is what stamps docs/openapi.json and the generated
+      # SDKs; the git tag is what stamps the running binary via -ldflags. If
+      # they disagree, the released image and the committed API artifacts claim
+      # different versions -- which is exactly the drift this file exists to
+      # prevent. Tag builds only; branch builds have no version to compare to.
+      - name: Verify VERSION matches the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          file="$(tr -d '[:space:]' < VERSION)"
+          if [ "$tag" != "$file" ]; then
+            echo "::error::tag $GITHUB_REF_NAME implies version '$tag' but VERSION says '$file'."
+            echo "::error::Bump VERSION, regenerate (just sdk), commit, then re-tag."
+            exit 1
+          fi
+          echo "VERSION ($file) matches tag ($GITHUB_REF_NAME)"
+
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
       - name: Install cosign

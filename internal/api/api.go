@@ -37,7 +37,12 @@ func Build(cfg config.Config, deps *app.Deps) (*Server, error) {
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeaders(cfg))
 
-	humaCfg := huma.DefaultConfig("Waggle", "0.1.0")
+	// Version comes from the build rather than a literal, so the served spec
+	// and /docs report what is actually running. It is "dev" for `go run`
+	// builds; release builds inject the git tag via -ldflags (see Dockerfile).
+	// `generate sdk` overrides this in the committed spec -- see specVersion
+	// in cmd/generate.go -- because "dev" is not a publishable SDK version.
+	humaCfg := huma.DefaultConfig("Waggle", buildinfo.Version)
 	humaCfg.OpenAPI.Info.Description = "Waggle API."
 	// Relative server URL (just the base path, no host). huma derives the
 	// API prefix from this for $schema links AND uses the request host as the
