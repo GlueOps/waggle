@@ -2,7 +2,7 @@
 
 # ---- Stage 1: build the frontend ----------------------------------------
 # Produces ui/dist, which is embedded into the Go binary via go:embed.
-FROM node:24-bookworm-slim@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7 AS ui
+FROM node:24-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS ui
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /ui
 
