@@ -1327,9 +1327,9 @@ func patchResourceUpdateStateID(outDir string) error {
 
 // addProviderImports inserts import paths into a generated provider file's
 // import block, after the terraform-plugin-framework schema import the
-// generator always emits. Already-present paths are left alone.
+// generator always emits — resource/schema in a resource, datasource/schema in
+// a data source. Already-present paths are left alone.
 func addProviderImports(content string, paths []string) (string, error) {
-	const anchor = "\t\"github.com/hashicorp/terraform-plugin-framework/resource/schema\"\n"
 	var add []string
 	for _, p := range paths {
 		if !strings.Contains(content, `"`+p+`"`) {
@@ -1339,10 +1339,15 @@ func addProviderImports(content string, paths []string) (string, error) {
 	if len(add) == 0 {
 		return content, nil
 	}
-	if !strings.Contains(content, anchor) {
-		return content, fmt.Errorf("schema import anchor not found; generator output may have changed")
+	for _, anchor := range []string{
+		"\t\"github.com/hashicorp/terraform-plugin-framework/resource/schema\"\n",
+		"\t\"github.com/hashicorp/terraform-plugin-framework/datasource/schema\"\n",
+	} {
+		if strings.Contains(content, anchor) {
+			return strings.Replace(content, anchor, anchor+strings.Join(add, ""), 1), nil
+		}
 	}
-	return strings.Replace(content, anchor, anchor+strings.Join(add, ""), 1), nil
+	return content, fmt.Errorf("schema import anchor not found; generator output may have changed")
 }
 
 // sortedKeys returns a map's keys in sorted order, so generator passes emit a
@@ -1844,26 +1849,31 @@ func patchPoolsMetadataMapping(outDir string) error {
 		return fmt.Errorf("write %s: %w", modelFile, err)
 	}
 
-	resourceFile := filepath.Join(providerDir, "pools_resource.go")
-	b, err = os.ReadFile(resourceFile)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", resourceFile, err)
-	}
-	resourceSrc := string(b)
-
+	// The data source shares PoolsModel, so its schema has to agree on the
+	// attribute type or the framework rejects the model at Get/Set time with a
+	// "can't use basetypes.StringValue as jsontypes.Normalized" diagnostic.
 	attrRe := regexp.MustCompile(`"metadata":\s*schema\.StringAttribute\{`)
-	if !attrRe.MatchString(resourceSrc) {
-		return fmt.Errorf("%s: metadata attribute not found; generator output may have changed", resourceFile)
-	}
-	if !strings.Contains(resourceSrc, "jsontypes.NormalizedType{}") {
-		resourceSrc = attrRe.ReplaceAllString(resourceSrc, "${0}\nCustomType: jsontypes.NormalizedType{},")
-	}
-	resourceSrc, err = addProviderImports(resourceSrc, []string{"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"})
-	if err != nil {
-		return fmt.Errorf("%s: %w", resourceFile, err)
-	}
-	if err := os.WriteFile(resourceFile, []byte(resourceSrc), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", resourceFile, err)
+	for _, name := range []string{"pools_resource.go", "pools_data_source.go"} {
+		file := filepath.Join(providerDir, name)
+		b, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", file, err)
+		}
+		src := string(b)
+
+		if !attrRe.MatchString(src) {
+			return fmt.Errorf("%s: metadata attribute not found; generator output may have changed", file)
+		}
+		if !strings.Contains(src, "jsontypes.NormalizedType{}") {
+			src = attrRe.ReplaceAllString(src, "${0}\nCustomType: jsontypes.NormalizedType{},")
+		}
+		src, err = addProviderImports(src, []string{"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"})
+		if err != nil {
+			return fmt.Errorf("%s: %w", file, err)
+		}
+		if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", file, err)
+		}
 	}
 
 	log.Printf("patched pools metadata: jsontypes.Normalized round-trip")
