@@ -28,7 +28,6 @@ release-prep version:
     set -euo pipefail
     echo "{{version}}" > VERSION
     just sdk
-    just terraform
     echo
     echo "VERSION is now {{version}} and artifacts are regenerated."
     echo "Next: review the diff, commit, merge to main, then tag on the merge commit:"
@@ -46,8 +45,12 @@ reset:
   down -v
   up
 
-terraform:
-  go run . generate terraform openapi-generator
+# Regenerate the Terraform provider into its own repository, expected at
+# ../terraform-provider-waggle (override with --out or WAGGLE_TF_PROVIDER_DIR).
+# Deliberately not part of release-prep: the provider versions and releases on
+# its own tags, so a waggle release must not silently rewrite that checkout.
+terraform *args:
+  go run . generate terraform openapi-generator {{args}}
 
 readme:
   npx repomix --include "CLAUDE.md,AGENTS.md,Justfile,Dockerfile,docker-compose*.yml,go.mod,agent/go.mod,ui/package.json,.goreleaser.yml,cmd/**/*.go,internal/handlers/*.go,internal/models/**/*.go,ui/src/routes/index.tsx,mprocs.yml" -o repomix-readme.md

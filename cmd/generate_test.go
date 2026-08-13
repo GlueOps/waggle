@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -206,5 +208,306 @@ func TestCommittedSDKTSConfigIsPatched(t *testing.T) {
 	}
 	if got := dev["typescript"]; got != "^6.0.0" {
 		t.Fatalf("sdk/ts/package.json typescript = %v, want \"^6.0.0\"", got)
+	}
+}
+
+// fixtureSpec exercises the shapes specImmutableAttrs has to tell apart:
+// a create/update pair that narrows its body (widgets), a create-only
+// collection (gadgets), a pair whose bodies match (crates), sub-resource
+// operations that are not a create/update pair (widgets/{id}/parts and the
+// non-collection POST under thing), and a $ref that has to be resolved.
+const fixtureSpec = `{
+  "paths": {
+    "/widgets": {
+      "post": {"tags": ["widgets"], "requestBody": {"content": {"application/json": {
+        "schema": {"$ref": "#/components/schemas/WidgetCreate"}}}}},
+      "get": {"tags": ["widgets"]}
+    },
+    "/widgets/{id}": {
+      "patch": {"tags": ["widgets"], "requestBody": {"content": {"application/json": {
+        "schema": {"properties": {"$schema": {}, "size": {}}}}}}},
+      "delete": {"tags": ["widgets"]}
+    },
+    "/widgets/{id}/parts": {
+      "post": {"tags": ["widgets"], "requestBody": {"content": {"application/json": {
+        "schema": {"properties": {"part": {}}}}}}}
+    },
+    "/gadgets": {
+      "post": {"tags": ["gadgets"], "requestBody": {"content": {"application/json": {
+        "schema": {"properties": {"$schema": {}, "name": {}, "serial": {}}}}}}}
+    },
+    "/crates": {
+      "post": {"tags": ["crates"], "requestBody": {"content": {"application/json": {
+        "schema": {"properties": {"name": {}, "height": {}}}}}}}
+    },
+    "/crates/{id}": {
+      "put": {"tags": ["crates"], "requestBody": {"content": {"application/json": {
+        "schema": {"properties": {"name": {}, "height": {}}}}}}}
+    },
+    "/thing/login": {
+      "post": {"tags": ["thing"], "requestBody": {"content": {"application/json": {
+        "schema": {"properties": {"password": {}}}}}}}
+    },
+    "/multi-word": {
+      "post": {"tags": ["multi-word"], "requestBody": {"content": {"application/json": {
+        "schema": {"properties": {"fixed": {}}}}}}}
+    }
+  },
+  "components": {"schemas": {"WidgetCreate": {"properties": {
+    "$schema": {}, "name": {}, "colour": {}, "size": {}}}}}
+}`
+
+func TestSpecImmutableAttrsFixture(t *testing.T) {
+	got, err := specImmutableAttrs([]byte(fixtureSpec))
+	if err != nil {
+		t.Fatalf("specImmutableAttrs: %v", err)
+	}
+
+	want := map[string][]string{
+		// create has name/colour/size, update only size.
+		"widgets": {"colour", "name"},
+		// no update endpoint at all, so nothing can ever be changed.
+		"gadgets": {"name", "serial"},
+		// create and update accept the same body.
+		"crates": {},
+		// tag becomes the resource file stem.
+		"multi_word": {"fixed"},
+	}
+	for resource, wantAttrs := range want {
+		gotAttrs, ok := got[resource]
+		if !ok {
+			t.Errorf("%s: missing from derivation", resource)
+			continue
+		}
+		if !slices.Equal(gotAttrs, wantAttrs) {
+			t.Errorf("%s: got %v, want %v", resource, gotAttrs, wantAttrs)
+		}
+	}
+	// /thing/login is a POST but not on a collection root, so "thing" is not a
+	// resource with a create endpoint.
+	if attrs, ok := got["thing"]; ok {
+		t.Errorf("thing: derived %v from a non-collection POST, want no entry", attrs)
+	}
+	if len(got) != len(want) {
+		t.Errorf("derived %d resources (%v), want %d", len(got), sortedKeys(got), len(want))
+	}
+}
+
+func TestSpecImmutableAttrsRejectsDanglingRef(t *testing.T) {
+	const spec = `{"paths": {"/widgets": {"post": {"tags": ["widgets"], "requestBody":
+	  {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Nope"}}}}}}}}`
+	if _, err := specImmutableAttrs([]byte(spec)); err == nil {
+		t.Fatal("expected an error for an unresolvable $ref, got nil")
+	}
+}
+
+// TestResourceImmutableAttrsMatchesSpec is the same tripwire
+// patchResourceImmutability enforces at generate time, run against the
+// committed spec so CI catches a narrowed update endpoint without anyone having
+// to regenerate the provider.
+func TestResourceImmutableAttrsMatchesSpec(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "docs", "openapi.json"))
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	derived, err := specImmutableAttrs(b)
+	if err != nil {
+		t.Fatalf("specImmutableAttrs: %v", err)
+	}
+
+	for _, resource := range sortedKeys(resourceImmutableAttrs) {
+		if _, ok := derived[resource]; !ok {
+			t.Errorf("%s: declared in resourceImmutableAttrs but not derivable from the spec", resource)
+		}
+	}
+
+	for _, resource := range sortedKeys(derived) {
+		if _, managed := resourceSchemaRoles[resource]; !managed {
+			continue
+		}
+		// Only attributes the provider actually models can carry a plan
+		// modifier; a write-only create field has nothing to attach one to.
+		var modelled []string
+		for _, attr := range derived[resource] {
+			if _, ok := resourceSchemaRoles[resource][attr]; ok {
+				modelled = append(modelled, attr)
+			}
+		}
+		if modelled == nil {
+			modelled = []string{}
+		}
+		if !slices.Equal(modelled, resourceImmutableAttrs[resource]) {
+			t.Errorf("%s: spec says %v is immutable, resourceImmutableAttrs declares %v",
+				resource, modelled, resourceImmutableAttrs[resource])
+		}
+	}
+}
+
+func TestAddProviderImports(t *testing.T) {
+	const src = `package provider
+
+import (
+	"context"
+
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+)
+`
+	out, err := addProviderImports(src, []string{
+		"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier",
+		"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier",
+	})
+	if err != nil {
+		t.Fatalf("addProviderImports: %v", err)
+	}
+	for _, want := range []string{"schema/planmodifier", "schema/stringplanmodifier"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing import %q in:\n%s", want, out)
+		}
+	}
+
+	// Re-running must not duplicate what is already there.
+	again, err := addProviderImports(out, []string{
+		"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier",
+	})
+	if err != nil {
+		t.Fatalf("addProviderImports (repeat): %v", err)
+	}
+	if again != out {
+		t.Errorf("second call changed the file:\n%s", again)
+	}
+
+	if _, err := addProviderImports("package provider\n", []string{"x"}); err == nil {
+		t.Fatal("expected an error when the schema import anchor is absent, got nil")
+	}
+}
+
+func TestAssertProviderCheckout(t *testing.T) {
+	t.Run("missing directory is allowed", func(t *testing.T) {
+		if err := assertProviderCheckout(filepath.Join(t.TempDir(), "nope")); err != nil {
+			t.Errorf("got %v, want nil", err)
+		}
+	})
+
+	t.Run("empty directory is allowed", func(t *testing.T) {
+		if err := assertProviderCheckout(t.TempDir()); err != nil {
+			t.Errorf("got %v, want nil", err)
+		}
+	})
+
+	t.Run("the provider checkout is allowed", func(t *testing.T) {
+		dir := t.TempDir()
+		mustWrite(t, filepath.Join(dir, "go.mod"), "module "+providerModulePath+"\n\ngo 1.25.8\n")
+		if err := assertProviderCheckout(dir); err != nil {
+			t.Errorf("got %v, want nil", err)
+		}
+	})
+
+	t.Run("some other module is refused", func(t *testing.T) {
+		dir := t.TempDir()
+		mustWrite(t, filepath.Join(dir, "go.mod"), "module github.com/glueops/waggle\n")
+		if err := assertProviderCheckout(dir); err == nil {
+			t.Error("expected an error for a foreign module, got nil")
+		}
+	})
+
+	t.Run("a non-empty directory with no go.mod is refused", func(t *testing.T) {
+		dir := t.TempDir()
+		mustWrite(t, filepath.Join(dir, "notes.txt"), "important\n")
+		if err := assertProviderCheckout(dir); err == nil {
+			t.Error("expected an error for a non-module directory, got nil")
+		}
+	})
+}
+
+func TestSyncProviderRepoPreservesRepoOwnedFiles(t *testing.T) {
+	stage := t.TempDir()
+	mustWrite(t, filepath.Join(stage, "internal", "client", "client.go"), "package client\n")
+	mustWrite(t, filepath.Join(stage, "internal", "provider", "provider.go"), "package provider\n")
+	mustWrite(t, filepath.Join(stage, ".openapi-generator", "FILES"), "main.go\n")
+	mustWrite(t, filepath.Join(stage, "go.mod"), "module "+providerModulePath+"\n\ngo 1.24.0\n")
+	mustWrite(t, filepath.Join(stage, "README.md"), "generated readme\n")
+
+	target := t.TempDir()
+	// Things the provider repo owns and the generator must not touch.
+	mustWrite(t, filepath.Join(target, "go.mod"), "module "+providerModulePath+"\n\ngo 1.25.8\n")
+	mustWrite(t, filepath.Join(target, "README.md"), "hand-written readme\n")
+	mustWrite(t, filepath.Join(target, ".goreleaser.yml"), "builds: []\n")
+	mustWrite(t, filepath.Join(target, ".changes", "0.1.20.md"), "notes\n")
+	mustWrite(t, filepath.Join(target, "docs", "index.md"), "docs\n")
+	mustWrite(t, filepath.Join(target, "examples", "resources", "waggle_pools", "resource.tf"), "curated\n")
+	// A generated file that no longer exists upstream must be swept away.
+	mustWrite(t, filepath.Join(target, "internal", "provider", "stale_resource.go"), "package provider\n")
+
+	if err := syncProviderRepo(stage, target); err != nil {
+		t.Fatalf("syncProviderRepo: %v", err)
+	}
+
+	for path, want := range map[string]string{
+		"go.mod":             "module " + providerModulePath + "\n\ngo 1.25.8\n",
+		"README.md":          "hand-written readme\n",
+		".goreleaser.yml":    "builds: []\n",
+		".changes/0.1.20.md": "notes\n",
+		"docs/index.md":      "docs\n",
+		"examples/resources/waggle_pools/resource.tf": "curated\n",
+		"internal/provider/provider.go":               "package provider\n",
+		"internal/client/client.go":                   "package client\n",
+	} {
+		b, err := os.ReadFile(filepath.Join(target, filepath.FromSlash(path)))
+		if err != nil {
+			t.Errorf("read %s: %v", path, err)
+			continue
+		}
+		if string(b) != want {
+			t.Errorf("%s: got %q, want %q", path, b, want)
+		}
+	}
+
+	if _, err := os.Stat(filepath.Join(target, "internal", "provider", "stale_resource.go")); !os.IsNotExist(err) {
+		t.Error("stale generated file survived the sync")
+	}
+}
+
+func TestSyncProviderRepoWritesMissingScaffolding(t *testing.T) {
+	stage := t.TempDir()
+	mustWrite(t, filepath.Join(stage, "internal", "client", "client.go"), "package client\n")
+	mustWrite(t, filepath.Join(stage, "internal", "provider", "provider.go"), "package provider\n")
+	mustWrite(t, filepath.Join(stage, ".openapi-generator", "FILES"), "main.go\n")
+	mustWrite(t, filepath.Join(stage, "go.mod"), "module "+providerModulePath+"\n")
+	mustWrite(t, filepath.Join(stage, "main.go"), "package main\n")
+
+	target := filepath.Join(t.TempDir(), "fresh-clone")
+	if err := syncProviderRepo(stage, target); err != nil {
+		t.Fatalf("syncProviderRepo: %v", err)
+	}
+	for _, name := range []string{"go.mod", "main.go", "internal/provider/provider.go"} {
+		if _, err := os.Stat(filepath.Join(target, filepath.FromSlash(name))); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestSyncProviderRepoRejectsUnknownGeneratedPackage(t *testing.T) {
+	stage := t.TempDir()
+	mustWrite(t, filepath.Join(stage, "internal", "client", "client.go"), "package client\n")
+	mustWrite(t, filepath.Join(stage, "internal", "provider", "provider.go"), "package provider\n")
+	mustWrite(t, filepath.Join(stage, "internal", "surprise", "x.go"), "package surprise\n")
+
+	err := syncProviderRepo(stage, t.TempDir())
+	if err == nil {
+		t.Fatal("expected an error for an unsynced generated package, got nil")
+	}
+	if !strings.Contains(err.Error(), "surprise") {
+		t.Errorf("error does not name the package: %v", err)
+	}
+}
+
+func mustWrite(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
 	}
 }

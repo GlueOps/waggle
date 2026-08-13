@@ -143,5 +143,5 @@ nothing (all-or-nothing).
 4. Read `GET /placements`, provision the VMs in Proxmox, and
    `PATCH /placements/{id}` to record each `vmid`.
 
-See the [Terraform provider](../terraform-provider-waggle/) for the managed
-version of this flow.
+See the [Terraform provider](https://github.com/GlueOps/terraform-provider-waggle)
+for the managed version of this flow.

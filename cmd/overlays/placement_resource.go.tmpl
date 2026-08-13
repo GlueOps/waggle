@@ -15,6 +15,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -55,8 +57,15 @@ func (r *PlacementsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"not by this resource.",
 		Attributes: map[string]schema.Attribute{
 			"placement_id": schema.StringAttribute{
-				Required:    true,
-				Description: "UUID of the waggle placement to adopt. Typically sourced from waggle_pool_placements.",
+				Required: true,
+				// Adopting a different placement is a different resource: the
+				// only write the API accepts here is the vmid backfill, so
+				// changing placement_id in place is not something Update can
+				// carry out. patchResourceImmutability derives this rule from
+				// the spec for the generated resources, but placements has no
+				// create endpoint to derive from — hence the explicit modifier.
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Description:   "UUID of the waggle placement to adopt. Typically sourced from waggle_pool_placements.",
 			},
 			"id": schema.StringAttribute{
 				Computed:    true,
