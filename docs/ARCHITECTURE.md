@@ -78,8 +78,13 @@ internal/
   utils/             crypto (AES-GCM envelope), password hashing, normalization
 ui/                  Vite/React SPA, embedded into the binary via go:embed
 sdk/                 Generated Go + TypeScript clients
-terraform-provider-waggle/  Generated + hand-overlaid Terraform provider
+cmd/overlays/        Hand-authored sources injected into the generated provider
 ```
+
+The Terraform provider is generated from this repo but lives in its own —
+[GlueOps/terraform-provider-waggle](https://github.com/GlueOps/terraform-provider-waggle),
+expected at `../terraform-provider-waggle`. See
+[DEVELOPMENT.md](DEVELOPMENT.md#terraform-provider).
 
 Dependencies are assembled once in `internal/app/deps.go` (the `Deps` struct)
 and threaded through commands. Routes are registered conditionally on which

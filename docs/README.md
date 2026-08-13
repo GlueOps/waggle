@@ -21,5 +21,5 @@ is named after the "waggle dance" bees use to communicate direction and timing.
 
 Waggle **does not create or boot VMs**. It is the source of truth for placement
 state; actual provisioning is performed by downstream consumers — primarily the
-[Terraform provider](../terraform-provider-waggle/) — that read placements from
+[Terraform provider](https://github.com/GlueOps/terraform-provider-waggle) — that read placements from
 Waggle and apply them to Proxmox.

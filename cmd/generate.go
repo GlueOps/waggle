@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"sort"
 	"strings"
 
 	"github.com/glueops/waggle/internal/api"
@@ -49,6 +51,15 @@ var slotsDataSourceSrc string
 //
 //go:embed overlays/placement_resource.go.tmpl
 var placementResourceSrc string
+
+// clientBodyTestSrc holds regression tests for the generated provider client:
+// that create bodies omit read-only fields, and that the API key is sent as a
+// Bearer token. Both assert the effect of a generator patch, so they live with
+// the generator — internal/client in the provider repo is replaced wholesale on
+// every regenerate and a test committed there would not survive.
+//
+//go:embed overlays/client_body_test.go.tmpl
+var clientBodyTestSrc string
 
 var generateMigrationsCmd = &cobra.Command{
 	Use:   "migrations [name]",
@@ -459,32 +470,36 @@ var generateTerraformOAGCmd = &cobra.Command{
 	Short: "Generate Terraform provider via OpenAPI Generator",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		specPath := "docs/openapi.json"
-		outDir := "terraform-provider-waggle"
+
+		// The provider is its own repository (github.com/GlueOps/terraform-provider-waggle),
+		// checked out alongside this one. Everything below is written into a
+		// staging directory and only then synced into that checkout — see
+		// syncProviderRepo for why this is not generated in place.
+		target, err := filepath.Abs(providerOutDir)
+		if err != nil {
+			return fmt.Errorf("resolve provider output dir: %w", err)
+		}
+		if err := assertProviderCheckout(target); err != nil {
+			return err
+		}
 
 		if err := generateOpenAPISpec(specPath); err != nil {
 			return err
 		}
 
-		// Preserve hand-authored examples across the clean+regenerate. The
-		// generator owns only examples/provider/provider.tf; everything else
-		// under examples/ is maintained by hand and would otherwise be lost to
-		// the RemoveAll below. Snapshot it now and overlay it back after
-		// generation (the restore wins on conflict, so curated examples persist).
-		examplesDir := filepath.Join(outDir, "examples")
-		snapshot, err := snapshotDir(examplesDir)
+		outDir, err := os.MkdirTemp("", "waggle-tf-provider-")
 		if err != nil {
-			return fmt.Errorf("snapshot examples: %w", err)
+			return fmt.Errorf("create staging dir: %w", err)
 		}
-		if snapshot != "" {
-			defer os.RemoveAll(snapshot)
-		}
+		defer os.RemoveAll(outDir)
 
-		if err := os.RemoveAll(outDir); err != nil {
-			return fmt.Errorf("failed to remove %s: %w", outDir, err)
-		}
-		if err := os.MkdirAll(outDir, 0o755); err != nil {
+		// The generator resolves -i relative to the working directory, and the
+		// staging dir is elsewhere; hand it an absolute path.
+		specAbs, err := filepath.Abs(specPath)
+		if err != nil {
 			return err
 		}
+		specPath = specAbs
 
 		args = []string{
 			"--yes",
@@ -539,9 +554,15 @@ var generateTerraformOAGCmd = &cobra.Command{
 			return err
 		}
 
-		// Fix the generated pool Update to use state.Id instead of plan.Id for
-		// the PATCH URL. plan.Id is "(known after apply)" during an update, which
-		// produces an empty path (/pools/) and an HTML error response.
+		// Build every Update's request URL from state.Id instead of plan.Id. A
+		// computed id is not guaranteed known in the plan, and an unknown one
+		// collapses the path to /pools/ and returns an HTML error response.
+		if err := patchResourceUpdateStateID(outDir); err != nil {
+			return err
+		}
+
+		// Narrow the pool Update body: PATCH /pools/{id} accepts only
+		// desired_count, not the whole PoolView the generator sends.
 		if err := patchPoolsResourceUpdate(outDir); err != nil {
 			return err
 		}
@@ -560,6 +581,20 @@ var generateTerraformOAGCmd = &cobra.Command{
 			return err
 		}
 
+		// Force replacement on attributes the API refuses to change after
+		// create. Runs after patchResourceSchemaRoles because it anchors on the
+		// attribute's opening brace and would otherwise break that pass's regex.
+		if err := patchResourceImmutability(outDir, specPath); err != nil {
+			return err
+		}
+
+		// Map pools.metadata, which the generator emits as a schema attribute
+		// but wires up in neither direction (free-form JSON has no Go type in
+		// the spec, so the model generator skips it).
+		if err := patchPoolsMetadataMapping(outDir); err != nil {
+			return err
+		}
+
 		// gofmt the provider package: the schema-role and registration patches
 		// emit loosely-spaced Go; gofmt normalizes alignment/indentation.
 		fmtProvider := exec.Command("gofmt", "-w", ".")
@@ -568,28 +603,173 @@ var generateTerraformOAGCmd = &cobra.Command{
 			return err
 		}
 
-		// Restore hand-authored examples, overlaying (and winning over) anything
-		// the generator wrote under examples/.
-		if snapshot != "" {
-			if err := copyTreeOverwrite(examplesDir, snapshot); err != nil {
-				return fmt.Errorf("restore examples: %w", err)
-			}
-			log.Printf("restored hand-authored examples under %s", examplesDir)
-		}
-
-		// The RemoveAll above takes go.sum with it and the generator only writes
-		// go.mod, so without this the provider module has no checksums and fails
-		// to build until someone runs tidy by hand. Mirrors what generateGo does
-		// for the Go SDK.
-		tidyProvider := exec.Command("go", "mod", "tidy")
-		tidyProvider.Dir = outDir
-		if err := run(tidyProvider, "go mod tidy -> "+outDir); err != nil {
+		// Copy the staged tree into the provider checkout, replacing only what
+		// the generator owns.
+		if err := syncProviderRepo(outDir, target); err != nil {
 			return err
 		}
 
-		log.Println("OpenAPI Generator Terraform provider generated successfully.")
+		// internal/ was replaced wholesale and go.mod may have just gained a
+		// dependency (jsontypes), so the checked-in go.sum is stale until this
+		// runs. Mirrors what generateGo does for the Go SDK.
+		tidyProvider := exec.Command("go", "mod", "tidy")
+		tidyProvider.Dir = target
+		if err := run(tidyProvider, "go mod tidy -> "+target); err != nil {
+			return err
+		}
+
+		log.Printf("OpenAPI Generator Terraform provider generated successfully into %s.", target)
 		return nil
 	},
+}
+
+// providerModulePath is the Go module path of the Terraform provider
+// repository. assertProviderCheckout uses it to confirm the output directory is
+// really that checkout before anything is written into it.
+const providerModulePath = "github.com/glueops/terraform-provider-waggle"
+
+// providerOutDir is the checkout the generated Terraform provider is written
+// into. The provider is a separate repository — it is published to the
+// Terraform and OpenTofu registries from its own tags — so the default assumes
+// it is cloned next to this one. Override with --out or WAGGLE_TF_PROVIDER_DIR.
+var providerOutDir string
+
+// defaultProviderOutDir resolves the default provider checkout location,
+// honouring WAGGLE_TF_PROVIDER_DIR so CI can point at a checkout elsewhere.
+func defaultProviderOutDir() string {
+	if v := os.Getenv("WAGGLE_TF_PROVIDER_DIR"); v != "" {
+		return v
+	}
+	return filepath.Join("..", "terraform-provider-waggle")
+}
+
+// assertProviderCheckout refuses to write into a directory that is neither
+// empty nor the provider repository. syncProviderRepo deletes whole subtrees,
+// so a mistyped --out would otherwise destroy unrelated work.
+func assertProviderCheckout(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // created on first sync
+		}
+		return fmt.Errorf("inspect provider output dir %s: %w", dir, err)
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+
+	b, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+	if err != nil {
+		return fmt.Errorf(
+			"provider output dir %s is not empty and has no go.mod; refusing to write into it "+
+				"(expected a checkout of %s — pass --out or set WAGGLE_TF_PROVIDER_DIR)",
+			dir, providerModulePath,
+		)
+	}
+	for line := range strings.SplitSeq(string(b), "\n") {
+		if !strings.HasPrefix(line, "module ") {
+			continue
+		}
+		if got := strings.TrimSpace(strings.TrimPrefix(line, "module ")); got != providerModulePath {
+			return fmt.Errorf(
+				"provider output dir %s declares module %q, want %q; refusing to write into it",
+				dir, got, providerModulePath,
+			)
+		}
+		return nil
+	}
+	return fmt.Errorf("provider output dir %s has a go.mod with no module directive; refusing to write into it", dir)
+}
+
+// generatorOwnedTrees are replaced wholesale on every run: everything under
+// them is generated, so a file that disappears from the spec must disappear
+// from the checkout too.
+var generatorOwnedTrees = []string{
+	filepath.Join("internal", "client"),
+	filepath.Join("internal", "provider"),
+	".openapi-generator",
+}
+
+// generatorScaffolding is written only when the provider checkout does not
+// already have it. These are the files the OpenAPI Generator emits once to make
+// a compilable module; the provider repository then owns them and has diverged
+// on purpose — go.mod carries a newer toolchain and terraform-plugin-docs,
+// README and GNUmakefile are hand-written, and examples/ is curated.
+var generatorScaffolding = []string{
+	".gitignore",
+	".openapi-generator-ignore",
+	"GNUmakefile",
+	"README.md",
+	"go.mod",
+	"main.go",
+	filepath.Join("examples", "provider", "provider.tf"),
+}
+
+// syncProviderRepo copies the staged provider tree into the real checkout.
+//
+// It replaces only generatorOwnedTrees and fills in generatorScaffolding when
+// absent, rather than clearing the target first. The target is a git repository
+// holding release machinery with no source in this repo — .git, .github/,
+// .changes/, docs/, .goreleaser.yml — and a wholesale wipe would take all of it.
+func syncProviderRepo(stage, target string) error {
+	// Tripwire: the sync list is hand-maintained, so a new generated package
+	// would otherwise be silently dropped on the floor.
+	staged, err := os.ReadDir(filepath.Join(stage, "internal"))
+	if err != nil {
+		return fmt.Errorf("read staged internal/: %w", err)
+	}
+	for _, e := range staged {
+		name := filepath.Join("internal", e.Name())
+		if !slices.Contains(generatorOwnedTrees, name) {
+			return fmt.Errorf(
+				"generator emitted %s, which syncProviderRepo does not copy; add it to generatorOwnedTrees",
+				name,
+			)
+		}
+	}
+
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		return err
+	}
+
+	for _, tree := range generatorOwnedTrees {
+		src := filepath.Join(stage, tree)
+		if _, err := os.Stat(src); err != nil {
+			return fmt.Errorf("generator produced no %s: %w", tree, err)
+		}
+		dst := filepath.Join(target, tree)
+		if err := os.RemoveAll(dst); err != nil {
+			return fmt.Errorf("clear %s: %w", dst, err)
+		}
+		if err := copyTreeOverwrite(dst, src); err != nil {
+			return fmt.Errorf("copy %s: %w", tree, err)
+		}
+		log.Printf("synced %s -> %s", tree, dst)
+	}
+
+	for _, name := range generatorScaffolding {
+		dst := filepath.Join(target, name)
+		if _, err := os.Stat(dst); err == nil {
+			continue // the provider repo owns it
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("stat %s: %w", dst, err)
+		}
+		b, err := os.ReadFile(filepath.Join(stage, name))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue // generator did not emit it this run
+			}
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(dst, b, 0o644); err != nil {
+			return err
+		}
+		log.Printf("wrote missing scaffolding %s", dst)
+	}
+	return nil
 }
 
 // schemaRole classifies a generated attribute. The OpenAPI Generator emits
@@ -733,6 +913,484 @@ func patchResourceSchemaRoles(outDir string) error {
 	return nil
 }
 
+// resourceImmutableAttrs declares, per resource, the attributes that get a
+// RequiresReplace plan modifier because the API refuses to change them after
+// create.
+//
+// This table is a tripwire, not the source of truth: specImmutableAttrs
+// recomputes the same sets from the OpenAPI spec on every run and
+// patchResourceImmutability fails if the two disagree. Its job is to make a
+// change in the API's write surface show up as a build failure here rather than
+// as a silently un-replaced attribute in the provider.
+//
+// A resource is listed with an empty set when create and update accept the same
+// body — that is a positive assertion that nothing is immutable, and it is what
+// makes a newly-narrowed update endpoint fail loudly.
+//
+// placements is absent on purpose: the API has no create endpoint for it
+// (placements are created by pools), so immutability cannot be derived. The
+// hand-authored overlay declares RequiresReplace on placement_id directly.
+var resourceImmutableAttrs = map[string][]string{
+	"datacenters":   {},
+	"hypervisors":   {},
+	"organizations": {},
+	"slots":         {},
+	// PATCH /pools/{id} binds only desired_count (resizePoolInput), and
+	// FleetService.ResizePool never touches the rest of the row. Without
+	// RequiresReplace, Terraform plans an in-place update the provider cannot
+	// perform, the PATCH response echoes the unchanged values back over the
+	// plan, and apply fails with "Provider produced inconsistent result".
+	"pools": {"datacenter_id", "metadata", "name", "slot_id"},
+}
+
+// planModifierPkgs maps a generated schema attribute type to the plugin
+// framework subpackage holding its plan modifiers. An attribute type missing
+// here is a hard error rather than a skip, so a new column type cannot quietly
+// lose its RequiresReplace.
+var planModifierPkgs = map[string]string{
+	"Bool":    "boolplanmodifier",
+	"Float64": "float64planmodifier",
+	"Int64":   "int64planmodifier",
+	"List":    "listplanmodifier",
+	"Map":     "mapplanmodifier",
+	"Number":  "numberplanmodifier",
+	"Object":  "objectplanmodifier",
+	"Set":     "setplanmodifier",
+	"String":  "stringplanmodifier",
+}
+
+// schemaAttrRe matches the opening of a generated schema attribute block:
+//
+//	"slot_id": schema.StringAttribute{
+//
+// Group 1 is the attribute name, group 2 the framework type.
+var schemaAttrRe = regexp.MustCompile(`"(\w+)":\s*schema\.(\w+)Attribute\{`)
+
+// oasSchema is the sliver of an OpenAPI schema object specImmutableAttrs needs:
+// either a reference into components/schemas or an inline property set.
+type oasSchema struct {
+	Ref        string                     `json:"$ref"`
+	Properties map[string]json.RawMessage `json:"properties"`
+}
+
+type oasOperation struct {
+	Tags        []string `json:"tags"`
+	RequestBody *struct {
+		Content map[string]struct {
+			Schema oasSchema `json:"schema"`
+		} `json:"content"`
+	} `json:"requestBody"`
+}
+
+type oasDocument struct {
+	Paths      map[string]map[string]json.RawMessage `json:"paths"`
+	Components struct {
+		Schemas map[string]oasSchema `json:"schemas"`
+	} `json:"components"`
+}
+
+// specImmutableAttrs derives, per resource, the request-body properties that a
+// client can set at create time but can never change afterwards: those present
+// in the create body and absent from the update body.
+//
+// The mapping from spec to resource follows what the OpenAPI Generator does —
+// operations are grouped by their first tag, and the tag becomes the resource
+// file name (api-keys -> api_keys_resource.go). Within a tag group the create
+// operation is the POST on the bare collection path (/pools) and the update
+// operation is the PUT or PATCH on that path plus one path parameter
+// (/pools/{id}). Anything that does not fit that shape — /auth/login, which is
+// a POST but not a collection; /organizations/{id}/members/{userId}, which is
+// nested a level deeper — is not a create/update pair and is ignored.
+//
+// A tag with a create and no matching update has every create property
+// immutable: there is no way to change any of them.
+func specImmutableAttrs(specJSON []byte) (map[string][]string, error) {
+	var doc oasDocument
+	if err := json.Unmarshal(specJSON, &doc); err != nil {
+		return nil, fmt.Errorf("parse openapi spec: %w", err)
+	}
+
+	resolve := func(s oasSchema) (map[string]json.RawMessage, error) {
+		if s.Ref != "" {
+			name := s.Ref[strings.LastIndex(s.Ref, "/")+1:]
+			target, ok := doc.Components.Schemas[name]
+			if !ok {
+				return nil, fmt.Errorf("unresolved schema ref %q", s.Ref)
+			}
+			return target.Properties, nil
+		}
+		return s.Properties, nil
+	}
+
+	bodyProps := func(op oasOperation) (map[string]json.RawMessage, error) {
+		if op.RequestBody == nil {
+			return nil, nil
+		}
+		content, ok := op.RequestBody.Content["application/json"]
+		if !ok {
+			return nil, nil
+		}
+		return resolve(content.Schema)
+	}
+
+	type opAt struct {
+		path string
+		op   oasOperation
+	}
+	creates := map[string][]opAt{}
+	updates := map[string][]opAt{}
+
+	for path, methods := range doc.Paths {
+		for method, raw := range methods {
+			method = strings.ToLower(method)
+			if method != "post" && method != "put" && method != "patch" {
+				continue
+			}
+			var op oasOperation
+			if err := json.Unmarshal(raw, &op); err != nil {
+				return nil, fmt.Errorf("parse %s %s: %w", strings.ToUpper(method), path, err)
+			}
+			if len(op.Tags) == 0 || op.RequestBody == nil {
+				continue
+			}
+			tag := op.Tags[0]
+			segs := strings.Split(strings.Trim(path, "/"), "/")
+			switch {
+			case method == "post" && len(segs) == 1 && !strings.Contains(path, "{"):
+				creates[tag] = append(creates[tag], opAt{path, op})
+			case method != "post" && len(segs) == 2 && !strings.Contains(segs[0], "{") &&
+				strings.HasPrefix(segs[1], "{") && strings.HasSuffix(segs[1], "}"):
+				updates[tag] = append(updates[tag], opAt{path, op})
+			}
+		}
+	}
+
+	out := map[string][]string{}
+	for tag, cs := range creates {
+		if len(cs) != 1 {
+			// Ambiguous: more than one collection POST under this tag, so
+			// there is no single "the create endpoint" to compare against.
+			continue
+		}
+		create := cs[0]
+
+		var update *oasOperation
+		for _, u := range updates[tag] {
+			if strings.HasPrefix(u.path, create.path+"/{") {
+				if update != nil {
+					update = nil // ambiguous; treat as underivable
+					break
+				}
+				o := u.op
+				update = &o
+			}
+		}
+
+		createProps, err := bodyProps(create.op)
+		if err != nil {
+			return nil, fmt.Errorf("%s create body: %w", tag, err)
+		}
+		var updateProps map[string]json.RawMessage
+		if update != nil {
+			if updateProps, err = bodyProps(*update); err != nil {
+				return nil, fmt.Errorf("%s update body: %w", tag, err)
+			}
+		}
+
+		immutable := []string{}
+		for name := range createProps {
+			// Huma injects $schema into every body; it is metadata, and
+			// dropTerraformSchemaField removes it from the provider entirely.
+			if name == "$schema" {
+				continue
+			}
+			if _, mutable := updateProps[name]; !mutable {
+				immutable = append(immutable, name)
+			}
+		}
+		sort.Strings(immutable)
+		out[strings.ReplaceAll(tag, "-", "_")] = immutable
+	}
+	return out, nil
+}
+
+// stableComputedAttrs are server-assigned attributes whose value is fixed for
+// the life of the resource, so the plan can carry the prior state forward
+// instead of showing "(known after apply)". updated_at is deliberately absent:
+// it does change on update.
+//
+// This is not only cosmetic. An unknown id in the plan is what forced the
+// pools Update to read its id out of state rather than the plan — see
+// patchResourceUpdateStateID.
+var stableComputedAttrs = []string{"created_at", "id"}
+
+// patchResourceImmutability attaches plan modifiers to generated schema
+// attributes: RequiresReplace on everything the API refuses to change after
+// create, so Terraform recreates the resource instead of planning an update it
+// cannot carry out, and UseStateForUnknown on server-assigned values that never
+// change.
+//
+// It must run after patchResourceSchemaRoles: it injects at the attribute's
+// opening brace, which sits between the anchor and the flag line that pass
+// rewrites.
+func patchResourceImmutability(outDir, specPath string) error {
+	specJSON, err := os.ReadFile(specPath)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", specPath, err)
+	}
+	derived, err := specImmutableAttrs(specJSON)
+	if err != nil {
+		return err
+	}
+
+	// Walk the union so a stale table entry for a resource the spec no longer
+	// describes is caught too.
+	resources := map[string]bool{}
+	for name := range derived {
+		resources[name] = true
+	}
+	for name := range resourceImmutableAttrs {
+		resources[name] = true
+	}
+
+	providerDir := filepath.Join(outDir, "internal", "provider")
+	for _, resource := range sortedKeys(resources) {
+		declared := resourceImmutableAttrs[resource]
+		immutable, inSpec := derived[resource]
+		if !inSpec {
+			return fmt.Errorf(
+				"resourceImmutableAttrs declares %q, but the spec has no derivable create/update pair for it; "+
+					"remove the entry or fix the derivation", resource,
+			)
+		}
+		if isOverlayFile(resource + "_resource.go") {
+			// The overlay declares its own plan modifiers; injecting here would
+			// duplicate them. placements is the live case and is unreachable
+			// anyway (it has no create endpoint to derive from), so this is a
+			// guard for the next overlay rather than a live branch.
+			log.Printf("note: %s is a hand-authored overlay; plan modifiers left to it", resource)
+			continue
+		}
+		if _, managed := resourceSchemaRoles[resource]; !managed {
+			if len(immutable) > 0 {
+				log.Printf(
+					"note: %s has spec-immutable attributes %v but no schema-role classification; not patched",
+					resource, immutable,
+				)
+			}
+			continue
+		}
+
+		file := filepath.Join(providerDir, resource+"_resource.go")
+		b, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", file, err)
+		}
+		content := string(b)
+
+		var applied, stable []string
+		var kinds []string
+		var walkErr error
+		patched := schemaAttrRe.ReplaceAllStringFunc(content, func(m string) string {
+			sub := schemaAttrRe.FindStringSubmatch(m)
+			field, kind := sub[1], sub[2]
+
+			var modifier string
+			switch {
+			case slices.Contains(immutable, field):
+				modifier = "RequiresReplace"
+			case slices.Contains(stableComputedAttrs, field) &&
+				resourceSchemaRoles[resource][field] == roleComputed:
+				modifier = "UseStateForUnknown"
+			default:
+				return m
+			}
+
+			pkg, ok := planModifierPkgs[kind]
+			if !ok {
+				walkErr = fmt.Errorf(
+					"%s: attribute %q is schema.%sAttribute, which has no entry in planModifierPkgs",
+					file, field, kind,
+				)
+				return m
+			}
+			if modifier == "RequiresReplace" {
+				applied = append(applied, field)
+			} else {
+				stable = append(stable, field)
+			}
+			if !slices.Contains(kinds, kind) {
+				kinds = append(kinds, kind)
+			}
+			return m + fmt.Sprintf("\nPlanModifiers: []planmodifier.%s{%s.%s()},", kind, pkg, modifier)
+		})
+		if walkErr != nil {
+			return walkErr
+		}
+
+		sort.Strings(applied)
+		if applied == nil {
+			applied = []string{}
+		}
+		if !slices.Equal(applied, declared) {
+			return fmt.Errorf(
+				"%s: the spec makes %v immutable and %v of those are schema attributes, "+
+					"but resourceImmutableAttrs declares %v; reconcile the table with the API",
+				file, immutable, applied, declared,
+			)
+		}
+		if len(applied)+len(stable) == 0 {
+			continue
+		}
+
+		imports := []string{"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"}
+		for _, kind := range kinds {
+			imports = append(imports, "github.com/hashicorp/terraform-plugin-framework/resource/schema/"+planModifierPkgs[kind])
+		}
+		patched, err = addProviderImports(patched, imports)
+		if err != nil {
+			return fmt.Errorf("%s: %w", file, err)
+		}
+		if err := os.WriteFile(file, []byte(patched), 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", file, err)
+		}
+		sort.Strings(stable)
+		log.Printf("patched %s: RequiresReplace on %v, UseStateForUnknown on %v", file, applied, stable)
+	}
+	return nil
+}
+
+// patchResourceUpdateStateID makes every generated Update build its request URL
+// from state.Id rather than plan.Id.
+//
+// A Computed id is not guaranteed to be known in the plan during an update, and
+// when it is unknown the formatted path collapses to "/datacenters/" — which the
+// API answers with an HTML 404 that surfaces as an unintelligible parse error.
+// state.Id is the id the resource was read back with and is always known, so it
+// is the correct source regardless. This was found and fixed by hand for pools;
+// the same shape was left in datacenters, hypervisors, organizations and slots.
+//
+// Resources whose Update never calls the API (the empty api_keys/auth/system
+// stubs) contain no plan.Id reference and are skipped.
+func patchResourceUpdateStateID(outDir string) error {
+	providerDir := filepath.Join(outDir, "internal", "provider")
+	updateRe := regexp.MustCompile(
+		`(?s)func \(r \*\w+Resource\) Update\(ctx context\.Context, req resource\.UpdateRequest, resp \*resource\.UpdateResponse\) \{.*?\n\}\n`,
+	)
+	declRe := regexp.MustCompile(
+		`\tvar plan (\w+)Model\n(\n\tresp\.Diagnostics\.Append\(req\.Plan\.Get\(ctx, &plan\)\.\.\.\)\n)`,
+	)
+
+	patched := 0
+	err := filepath.WalkDir(providerDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, "_resource.go") {
+			return nil
+		}
+		// The overlays are keyed on a Required, always-known id rather than a
+		// computed one, so there is nothing to rewrite.
+		if isOverlayFile(path) {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+		content := string(b)
+
+		update := updateRe.FindString(content)
+		if update == "" {
+			return fmt.Errorf("%s: Update method not found; generator output may have changed", path)
+		}
+		if !strings.Contains(update, "plan.Id.ValueString()") {
+			return nil // no API call, or already reads from state
+		}
+		if !declRe.MatchString(update) {
+			return fmt.Errorf("%s: Update does not open with the expected plan declaration", path)
+		}
+
+		fixed := declRe.ReplaceAllString(update,
+			"\tvar plan ${1}Model\n\tvar state ${1}Model\n${2}"+
+				"\tresp.Diagnostics.Append(req.State.Get(ctx, &state)...)\n")
+		// Use state.Id (known current value) not plan.Id (may be unknown).
+		fixed = strings.ReplaceAll(fixed, "plan.Id.ValueString()", "state.Id.ValueString()")
+
+		if err := os.WriteFile(path, []byte(strings.Replace(content, update, fixed, 1)), 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", path, err)
+		}
+		log.Printf("patched %s: Update uses state.Id for the request URL", path)
+		patched++
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if patched == 0 {
+		return fmt.Errorf("no resource Update used plan.Id; generator output may have changed")
+	}
+	return nil
+}
+
+// addProviderImports inserts import paths into a generated provider file's
+// import block, after the terraform-plugin-framework schema import the
+// generator always emits — resource/schema in a resource, datasource/schema in
+// a data source. Already-present paths are left alone.
+func addProviderImports(content string, paths []string) (string, error) {
+	var add []string
+	for _, p := range paths {
+		if !strings.Contains(content, `"`+p+`"`) {
+			add = append(add, "\t\""+p+"\"\n")
+		}
+	}
+	if len(add) == 0 {
+		return content, nil
+	}
+	for _, anchor := range []string{
+		"\t\"github.com/hashicorp/terraform-plugin-framework/resource/schema\"\n",
+		"\t\"github.com/hashicorp/terraform-plugin-framework/datasource/schema\"\n",
+	} {
+		if strings.Contains(content, anchor) {
+			return strings.Replace(content, anchor, anchor+strings.Join(add, ""), 1), nil
+		}
+	}
+	return content, fmt.Errorf("schema import anchor not found; generator output may have changed")
+}
+
+// sortedKeys returns a map's keys in sorted order, so generator passes emit a
+// stable ordering of log lines and errors run to run.
+func sortedKeys[V any](m map[string]V) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// overlayProviderFiles are the hand-authored files writeProviderOverlays lays
+// over the generator's output. They are already correct by construction, so the
+// patch passes must leave them alone: a pass that rewrites one either
+// double-applies a fix the overlay already carries, or silently reverts a
+// deliberate difference from the generated shape.
+//
+// The passes that skip them say so by consulting this list rather than testing
+// a filename inline, so adding an overlay does not mean remembering which
+// passes need a new exception. patchResourceSchemaRoles is the one deliberate
+// exception: it runs over placements_resource.go on purpose, to assert
+// idempotently that the overlay's attribute roles still match the table.
+var overlayProviderFiles = []string{
+	"pool_placements_data_source.go",
+	"slots_data_source.go",
+	"placements_resource.go",
+}
+
+// isOverlayFile reports whether path is one of the hand-authored overlays.
+func isOverlayFile(path string) bool {
+	return slices.Contains(overlayProviderFiles, filepath.Base(path))
+}
+
 // writeProviderOverlays drops hand-authored provider source files into the
 // generated provider and registers them in provider.go. These cover resources
 // and data sources the OpenAPI Generator cannot model (e.g. lists of nested
@@ -768,7 +1426,12 @@ func writeProviderOverlays(outDir string) error {
 		return fmt.Errorf("write overlay %s: %w", placementsDst, err)
 	}
 
-	log.Printf("injected provider overlays: pool_placements_data_source.go, slots_data_source.go, placements_resource.go")
+	clientTestDst := filepath.Join(outDir, "internal", "client", "auth_body_test.go")
+	if err := os.WriteFile(clientTestDst, []byte(clientBodyTestSrc), 0o644); err != nil {
+		return fmt.Errorf("write overlay %s: %w", clientTestDst, err)
+	}
+
+	log.Printf("injected provider overlays: pool_placements_data_source.go, slots_data_source.go, placements_resource.go, client/auth_body_test.go")
 	return nil
 }
 
@@ -795,31 +1458,10 @@ func registerDataSource(providerFile, constructor string) error {
 	return nil
 }
 
-// snapshotDir copies srcDir into a fresh temp directory and returns its path,
-// so the caller can restore it after a destructive regenerate. Returns "" (no
-// error) when srcDir does not exist.
-func snapshotDir(srcDir string) (string, error) {
-	if _, err := os.Stat(srcDir); err != nil {
-		if os.IsNotExist(err) {
-			return "", nil
-		}
-		return "", err
-	}
-	tmp, err := os.MkdirTemp("", "waggle-tf-examples-")
-	if err != nil {
-		return "", err
-	}
-	if err := copyTreeOverwrite(tmp, srcDir); err != nil {
-		_ = os.RemoveAll(tmp)
-		return "", err
-	}
-	return tmp, nil
-}
-
 // copyTreeOverwrite recursively copies src into dst, creating directories as
 // needed and overwriting any existing files (unlike os.CopyFS, which errors on
-// pre-existing files). Used to overlay preserved examples on top of generator
-// output.
+// pre-existing files). Used by syncProviderRepo to lay generator output over
+// the provider checkout.
 func copyTreeOverwrite(dst, src string) error {
 	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -1124,6 +1766,13 @@ func buildOpenAPISpecBytes() ([]byte, error) {
 	return b, nil
 }
 func init() {
+	generateTerraformOAGCmd.Flags().StringVar(
+		&providerOutDir,
+		"out",
+		defaultProviderOutDir(),
+		"checkout of github.com/GlueOps/terraform-provider-waggle to generate into",
+	)
+
 	generateTerraformCmd.AddCommand(generateTerraformHashiCmd)
 	generateTerraformCmd.AddCommand(generateTerraformOAGCmd)
 
@@ -1133,9 +1782,13 @@ func init() {
 	rootCmd.AddCommand(generateCmd)
 }
 
-// patchPoolsResourceUpdate fixes the generated pools Update to use state.Id
-// for the PATCH URL instead of plan.Id, which is "(known after apply)" during
-// an update and produces an empty path (/pools/) that returns an HTML error.
+// patchPoolsResourceUpdate narrows the pools Update request body to
+// desired_count. PATCH /pools/{id} binds only that field (resizePoolInput), and
+// the strict Huma API rejects the full PoolView the generator sends.
+//
+// The other half of the historical pools fix — reading the id out of state
+// rather than the plan — is now patchResourceUpdateStateID and applies to every
+// resource, so it runs first and this anchors on its output.
 func patchPoolsResourceUpdate(outDir string) error {
 	file := filepath.Join(outDir, "internal", "provider", "pools_resource.go")
 	b, err := os.ReadFile(file)
@@ -1144,43 +1797,116 @@ func patchPoolsResourceUpdate(outDir string) error {
 	}
 	content := string(b)
 
-	const old = `func (r *PoolsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan PoolsModel
+	const old = "\treqBody := plan.ToClientModel()\n\n" +
+		"\trespBody, err := r.client.DoRequest(ctx, \"PATCH\", fmt.Sprintf(\"/pools/%v\", state.Id.ValueString()), reqBody)"
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	reqBody := plan.ToClientModel()
-
-	respBody, err := r.client.DoRequest(ctx, "PATCH", fmt.Sprintf("/pools/%v", plan.Id.ValueString()), reqBody)`
-
-	const patched = `func (r *PoolsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan PoolsModel
-	var state PoolsModel
-
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Resize endpoint only accepts desired_count — not the full pool body.
-	resizeBody := map[string]int64{"desired_count": plan.DesiredCount.ValueInt64()}
-
-	// Use state.Id (known current value) not plan.Id (unknown during update).
-	respBody, err := r.client.DoRequest(ctx, "PATCH", fmt.Sprintf("/pools/%v", state.Id.ValueString()), resizeBody)`
+	const patched = "\t// The resize endpoint only accepts desired_count, not the full pool body.\n" +
+		"\tresizeBody := map[string]int64{\"desired_count\": plan.DesiredCount.ValueInt64()}\n\n" +
+		"\trespBody, err := r.client.DoRequest(ctx, \"PATCH\", fmt.Sprintf(\"/pools/%v\", state.Id.ValueString()), resizeBody)"
 
 	if !strings.Contains(content, old) {
-		log.Printf("note: pools_resource.go Update already patched or generator output changed; skipping")
-		return nil
+		return fmt.Errorf("%s: pools Update body not found in the expected shape; generator output may have changed", file)
 	}
-	patched2 := strings.Replace(content, old, patched, 1)
-	if err := os.WriteFile(file, []byte(patched2), 0o644); err != nil {
+	if err := os.WriteFile(file, []byte(strings.Replace(content, old, patched, 1)), 0o644); err != nil {
 		return fmt.Errorf("write %s: %w", file, err)
 	}
-	log.Printf("patched pools_resource.go: Update uses state.Id for PATCH URL")
+	log.Printf("patched pools_resource.go: Update sends only desired_count")
+	return nil
+}
+
+// patchPoolsMetadataMapping wires up pools.metadata, which the generator
+// advertises as a schema attribute but maps in neither direction.
+//
+// metadata is json.RawMessage in the API, so the spec types it as a free-form
+// object, the OpenAPI Generator renders it as interface{} in client.PoolView,
+// and the model generator — which only knows how to emit types.String/Int64/
+// Bool conversions — skips it. The attribute stays in the schema, so Terraform
+// accepts it in config and (being Optional and untouched) keeps whatever was
+// planned, while the value is silently dropped on create and never refreshed on
+// read.
+//
+// The fix types it as jsontypes.Normalized rather than a plain string: two JSON
+// documents differing only in key order or whitespace are then semantically
+// equal, so a round-trip through the API does not read as a diff.
+func patchPoolsMetadataMapping(outDir string) error {
+	providerDir := filepath.Join(outDir, "internal", "provider")
+
+	modelFile := filepath.Join(providerDir, "pools_model.go")
+	b, err := os.ReadFile(modelFile)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", modelFile, err)
+	}
+	model := string(b)
+
+	fieldRe := regexp.MustCompile("(?m)^\tMetadata\\s+types\\.String\\s+`tfsdk:\"metadata\"`$")
+	if !fieldRe.MatchString(model) {
+		return fmt.Errorf("%s: Metadata field not found in the expected shape; generator output may have changed", modelFile)
+	}
+	model = fieldRe.ReplaceAllString(model, "\tMetadata jsontypes.Normalized `tfsdk:\"metadata\"`")
+
+	const modelImports = "import (\n\t\"github.com/hashicorp/terraform-plugin-framework/types\"\n"
+	if !strings.Contains(model, modelImports) {
+		return fmt.Errorf("%s: import block not found in the expected shape; generator output may have changed", modelFile)
+	}
+	model = strings.Replace(model, modelImports,
+		"import (\n\t\"encoding/json\"\n\n"+
+			"\t\"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes\"\n"+
+			"\t\"github.com/hashicorp/terraform-plugin-framework/types\"\n", 1)
+
+	toRe := regexp.MustCompile(`(?s)(func \(m \*PoolsModel\) ToClientModel\(\) \*client\.PoolView \{.*?)(\n\treturn out\n\})`)
+	if !toRe.MatchString(model) {
+		return fmt.Errorf("%s: ToClientModel not found in the expected shape; generator output may have changed", modelFile)
+	}
+	model = toRe.ReplaceAllString(model, "${1}\n"+
+		"\tif !m.Metadata.IsNull() && !m.Metadata.IsUnknown() {\n"+
+		"\t\t// json.RawMessage marshals through the interface{} field verbatim.\n"+
+		"\t\tout.Metadata = json.RawMessage(m.Metadata.ValueString())\n"+
+		"\t}${2}")
+
+	fromRe := regexp.MustCompile(`(?s)(func \(m \*PoolsModel\) FromClientModel\(c \*client\.PoolView\) \{.*?)(\n\})`)
+	if !fromRe.MatchString(model) {
+		return fmt.Errorf("%s: FromClientModel not found in the expected shape; generator output may have changed", modelFile)
+	}
+	model = fromRe.ReplaceAllString(model, "${1}\n"+
+		"\tm.Metadata = jsontypes.NewNormalizedNull()\n"+
+		"\tif c.Metadata != nil {\n"+
+		"\t\tif b, err := json.Marshal(c.Metadata); err == nil {\n"+
+		"\t\t\tm.Metadata = jsontypes.NewNormalizedValue(string(b))\n"+
+		"\t\t}\n"+
+		"\t}${2}")
+
+	if err := os.WriteFile(modelFile, []byte(model), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", modelFile, err)
+	}
+
+	// The data source shares PoolsModel, so its schema has to agree on the
+	// attribute type or the framework rejects the model at Get/Set time with a
+	// "can't use basetypes.StringValue as jsontypes.Normalized" diagnostic.
+	attrRe := regexp.MustCompile(`"metadata":\s*schema\.StringAttribute\{`)
+	for _, name := range []string{"pools_resource.go", "pools_data_source.go"} {
+		file := filepath.Join(providerDir, name)
+		b, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", file, err)
+		}
+		src := string(b)
+
+		if !attrRe.MatchString(src) {
+			return fmt.Errorf("%s: metadata attribute not found; generator output may have changed", file)
+		}
+		if !strings.Contains(src, "jsontypes.NormalizedType{}") {
+			src = attrRe.ReplaceAllString(src, "${0}\nCustomType: jsontypes.NormalizedType{},")
+		}
+		src, err = addProviderImports(src, []string{"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"})
+		if err != nil {
+			return fmt.Errorf("%s: %w", file, err)
+		}
+		if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", file, err)
+		}
+	}
+
+	log.Printf("patched pools metadata: jsontypes.Normalized round-trip")
 	return nil
 }
 
@@ -1214,9 +1940,9 @@ func patchResourceRead404(outDir string) error {
 		if d.IsDir() || !strings.HasSuffix(path, "_resource.go") {
 			return nil
 		}
-		// placements_resource.go is a hand-authored overlay that already handles
-		// 404 correctly — skip it to avoid a double-injection.
-		if strings.HasSuffix(path, "placements_resource.go") {
+		// The overlays already handle 404 correctly; re-injecting would double
+		// the guard.
+		if isOverlayFile(path) {
 			return nil
 		}
 		b, err := os.ReadFile(path)

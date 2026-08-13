@@ -1,0 +1,82 @@
+{
+  "_comment": "Written by dragon-dev-buddy:buddy-setup on 2026-07-31. Re-run that skill when the project, stack or threat profile changes. Safe to commit: no secrets, and the engagement block references only self-owned infrastructure. Note: the live_url is a PRODUCTION instance — prefer non-destructive checks against it.",
+  "version": 1,
+  "project": {
+    "name": "waggle",
+    "what_it_is": "Placement oracle and ledger for Proxmox infrastructure — authoritative source of truth for VM placement state across hypervisors. Does not provision VMs itself; companion River workers and the Terraform provider do that.",
+    "repo": "github.com/glueops/waggle",
+    "live_url": "https://waggle.glueopshosted.rocks/api/v1",
+    "primary_language": "Go",
+    "stack": [
+      "Go 1.26",
+      "Huma v2 (OpenAPI) on go-chi v5",
+      "PostgreSQL + GORM",
+      "River job queue",
+      "Goose v3 + Atlas migrations (atlas-provider-gorm, model-first)",
+      "React + TS + Vite + shadcn + @tanstack/react-query",
+      "generated Go/TS SDKs + terraform-provider-waggle"
+    ],
+    "runtime": "Docker container image (ghcr.io), split serve/worker processes",
+    "deploy_target": "GitHub Actions docker-publish to ghcr.io; live at https://waggle.glueopshosted.rocks"
+  },
+  "security": {
+    "exposure": "public",
+    "data_sensitivity": "credentials",
+    "compliance": [],
+    "compliance_planned": ["SOC 2", "GDPR", "CCPA/CPRA"],
+    "auth_model": "JWT bearer tokens + API keys; multi-tenant orgs with isolated per-tenant encrypted databases; two-tier KEK->DEK envelope encryption; session tracking and an auth-event audit trail",
+    "trust_boundaries": [
+      "anonymous internet -> API (public surface: health, auth/signup)",
+      "authenticated caller -> API (JWT / API key)",
+      "API -> control database",
+      "API -> per-tenant encrypted databases (tenant isolation boundary)",
+      "tenant -> tenant (multi-tenant isolation)",
+      "API -> River job queue -> provisioning workers",
+      "waggle / workers -> Proxmox hypervisors (the fleet it commands)",
+      "KEK -> DEK envelope encryption / key custody"
+    ],
+    "known_risk_areas": [
+      "No SAST / SCA / secret-scanning in CI yet",
+      "Two-tier KEK->DEK envelope encryption — verify key custody, rotation, and that DEKs are never logged or returned",
+      "Multi-tenant isolation is a core property — verify no cross-tenant path via id-addressed org/tenant/pool/slot resources (IDOR)",
+      "Placement oracle commands a real hypervisor fleet — integrity of placement decisions is a security property, not just correctness"
+    ]
+  },
+  "engagement": {
+    "_comment": "Self-owned infrastructure. Owner authorized testing against the live instance during setup. Not a client engagement.",
+    "authorized_scope": [
+      "https://waggle.glueopshosted.rocks/api/v1 (own production instance)"
+    ],
+    "out_of_scope": [
+      "the Proxmox hypervisors themselves",
+      "companion River provisioning workers",
+      "any other glueopshosted.rocks service"
+    ],
+    "authorization_ref": "self-owned; owner authorized live-instance testing in setup 2026-07-31",
+    "contact": "alanis.swanepoel@glueops.dev"
+  },
+  "practice": {
+    "test_command": "go test ./...",
+    "lint_command": "go vet ./...",
+    "build_command": "go build ./...",
+    "dev_command": "mprocs (go run . serve | go run . worker | yarn dev)",
+    "sca_tool": "none",
+    "sast_tool": "none",
+    "secret_scanner": "none",
+    "ci": "GitHub Actions (docker-publish, image cleanup)"
+  },
+  "buddy": {
+    "enabled": true,
+    "server": "buddy",
+    "observe_after_every_skill": true,
+    "skill_prefix": "dragon-dev-buddy"
+  },
+  "output": {
+    "reports_dir": "docs/security",
+    "format": "markdown"
+  },
+  "skill_level": "Experienced Go / platform engineer building out the appsec practice; wants SOC 2 / GDPR / CCPA readiness",
+  "voice": {
+    "avoid": []
+  }
+}

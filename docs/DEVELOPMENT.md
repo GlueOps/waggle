@@ -102,13 +102,43 @@ headers and bodies.
 
 ### Terraform provider
 
+The provider is a **separate repository**,
+[GlueOps/terraform-provider-waggle](https://github.com/GlueOps/terraform-provider-waggle),
+published to the [Terraform](https://registry.terraform.io/providers/GlueOps/waggle/latest)
+and [OpenTofu](https://search.opentofu.org/provider/glueops/waggle/latest)
+registries from its own tags. Clone it next to this one:
+
 ```bash
+git clone git@github.com:GlueOps/terraform-provider-waggle.git ../terraform-provider-waggle
 just terraform                     # = go run . generate terraform openapi-generator
 ```
 
-Regenerates `terraform-provider-waggle/` from the spec, then re-applies the
-hand-authored overlays in `cmd/overlays/` (e.g. the pool-placements data
-source).
+Generation stages into a temp directory and then syncs only what the generator
+owns — `internal/client/`, `internal/provider/` and `.openapi-generator/` are
+replaced wholesale, while `go.mod`, `main.go`, `GNUmakefile`, `README.md` and
+`examples/` are written only if missing. Everything else in that repo (`.github/`,
+`.changes/`, `docs/`, `.goreleaser.yml`) is never touched. Pass `--out` or set
+`WAGGLE_TF_PROVIDER_DIR` to generate into a checkout elsewhere; the command
+refuses to write into a directory that is neither empty nor that module.
+
+Regeneration re-applies the hand-authored overlays in `cmd/overlays/` (the
+pool-placements and slots data sources, the placements resource, and the client
+regression tests) plus the patch passes in `cmd/generate.go`. **Never hand-edit
+the provider's `internal/` — every file there carries a `DO NOT EDIT` header and
+the next regenerate reverts it.** Fixes belong in an overlay or a patch pass.
+
+Two of those passes encode API semantics worth knowing about:
+
+- `patchResourceImmutability` derives, from the spec, which attributes appear in
+  an entity's create body but not its update body, and gives each a
+  `RequiresReplace` plan modifier. Today that is `waggle_pools`, whose `PATCH`
+  accepts only `desired_count`. Without it Terraform plans an in-place update the
+  API cannot perform and apply fails with *"Provider produced inconsistent result
+  after apply"*. The derived set is cross-checked against `resourceImmutableAttrs`,
+  so narrowing an update endpoint fails the build here rather than in someone's
+  `terraform apply`.
+- `patchPoolsMetadataMapping` types `pools.metadata` as `jsontypes.Normalized`,
+  so free-form JSON round-trips without key-order or whitespace diffs.
 
 ## Typical change workflow
 
