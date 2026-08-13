@@ -554,9 +554,15 @@ var generateTerraformOAGCmd = &cobra.Command{
 			return err
 		}
 
-		// Fix the generated pool Update to use state.Id instead of plan.Id for
-		// the PATCH URL. plan.Id is "(known after apply)" during an update, which
-		// produces an empty path (/pools/) and an HTML error response.
+		// Build every Update's request URL from state.Id instead of plan.Id. A
+		// computed id is not guaranteed known in the plan, and an unknown one
+		// collapses the path to /pools/ and returns an HTML error response.
+		if err := patchResourceUpdateStateID(outDir); err != nil {
+			return err
+		}
+
+		// Narrow the pool Update body: PATCH /pools/{id} accepts only
+		// desired_count, not the whole PoolView the generator sends.
 		if err := patchPoolsResourceUpdate(outDir); err != nil {
 			return err
 		}
@@ -1108,9 +1114,21 @@ func specImmutableAttrs(specJSON []byte) (map[string][]string, error) {
 	return out, nil
 }
 
-// patchResourceImmutability gives every server-immutable attribute a
-// RequiresReplace plan modifier, so Terraform destroys and recreates the
-// resource instead of planning an update the API cannot carry out.
+// stableComputedAttrs are server-assigned attributes whose value is fixed for
+// the life of the resource, so the plan can carry the prior state forward
+// instead of showing "(known after apply)". updated_at is deliberately absent:
+// it does change on update.
+//
+// This is not only cosmetic. An unknown id in the plan is what forced the
+// pools Update to read its id out of state rather than the plan — see
+// patchResourceUpdateStateID.
+var stableComputedAttrs = []string{"created_at", "id"}
+
+// patchResourceImmutability attaches plan modifiers to generated schema
+// attributes: RequiresReplace on everything the API refuses to change after
+// create, so Terraform recreates the resource instead of planning an update it
+// cannot carry out, and UseStateForUnknown on server-assigned values that never
+// change.
 //
 // It must run after patchResourceSchemaRoles: it injects at the attribute's
 // opening brace, which sits between the anchor and the flag line that pass
@@ -1162,15 +1180,24 @@ func patchResourceImmutability(outDir, specPath string) error {
 		}
 		content := string(b)
 
-		var applied []string
+		var applied, stable []string
 		var kinds []string
 		var walkErr error
 		patched := schemaAttrRe.ReplaceAllStringFunc(content, func(m string) string {
 			sub := schemaAttrRe.FindStringSubmatch(m)
 			field, kind := sub[1], sub[2]
-			if !slices.Contains(immutable, field) {
+
+			var modifier string
+			switch {
+			case slices.Contains(immutable, field):
+				modifier = "RequiresReplace"
+			case slices.Contains(stableComputedAttrs, field) &&
+				resourceSchemaRoles[resource][field] == roleComputed:
+				modifier = "UseStateForUnknown"
+			default:
 				return m
 			}
+
 			pkg, ok := planModifierPkgs[kind]
 			if !ok {
 				walkErr = fmt.Errorf(
@@ -1179,11 +1206,15 @@ func patchResourceImmutability(outDir, specPath string) error {
 				)
 				return m
 			}
-			applied = append(applied, field)
+			if modifier == "RequiresReplace" {
+				applied = append(applied, field)
+			} else {
+				stable = append(stable, field)
+			}
 			if !slices.Contains(kinds, kind) {
 				kinds = append(kinds, kind)
 			}
-			return m + fmt.Sprintf("\nPlanModifiers: []planmodifier.%s{%s.RequiresReplace()},", kind, pkg)
+			return m + fmt.Sprintf("\nPlanModifiers: []planmodifier.%s{%s.%s()},", kind, pkg, modifier)
 		})
 		if walkErr != nil {
 			return walkErr
@@ -1200,7 +1231,7 @@ func patchResourceImmutability(outDir, specPath string) error {
 				file, immutable, applied, declared,
 			)
 		}
-		if len(applied) == 0 {
+		if len(applied)+len(stable) == 0 {
 			continue
 		}
 
@@ -1215,7 +1246,81 @@ func patchResourceImmutability(outDir, specPath string) error {
 		if err := os.WriteFile(file, []byte(patched), 0o644); err != nil {
 			return fmt.Errorf("write %s: %w", file, err)
 		}
-		log.Printf("patched %s: RequiresReplace on %v", file, applied)
+		sort.Strings(stable)
+		log.Printf("patched %s: RequiresReplace on %v, UseStateForUnknown on %v", file, applied, stable)
+	}
+	return nil
+}
+
+// patchResourceUpdateStateID makes every generated Update build its request URL
+// from state.Id rather than plan.Id.
+//
+// A Computed id is not guaranteed to be known in the plan during an update, and
+// when it is unknown the formatted path collapses to "/datacenters/" — which the
+// API answers with an HTML 404 that surfaces as an unintelligible parse error.
+// state.Id is the id the resource was read back with and is always known, so it
+// is the correct source regardless. This was found and fixed by hand for pools;
+// the same shape was left in datacenters, hypervisors, organizations and slots.
+//
+// Resources whose Update never calls the API (the empty api_keys/auth/system
+// stubs) contain no plan.Id reference and are skipped.
+func patchResourceUpdateStateID(outDir string) error {
+	providerDir := filepath.Join(outDir, "internal", "provider")
+	updateRe := regexp.MustCompile(
+		`(?s)func \(r \*\w+Resource\) Update\(ctx context\.Context, req resource\.UpdateRequest, resp \*resource\.UpdateResponse\) \{.*?\n\}\n`,
+	)
+	declRe := regexp.MustCompile(
+		`\tvar plan (\w+)Model\n(\n\tresp\.Diagnostics\.Append\(req\.Plan\.Get\(ctx, &plan\)\.\.\.\)\n)`,
+	)
+
+	patched := 0
+	err := filepath.WalkDir(providerDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, "_resource.go") {
+			return nil
+		}
+		// placements_resource.go is a hand-authored overlay keyed on a Required
+		// placement_id, which is always known.
+		if strings.HasSuffix(path, "placements_resource.go") {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+		content := string(b)
+
+		update := updateRe.FindString(content)
+		if update == "" {
+			return fmt.Errorf("%s: Update method not found; generator output may have changed", path)
+		}
+		if !strings.Contains(update, "plan.Id.ValueString()") {
+			return nil // no API call, or already reads from state
+		}
+		if !declRe.MatchString(update) {
+			return fmt.Errorf("%s: Update does not open with the expected plan declaration", path)
+		}
+
+		fixed := declRe.ReplaceAllString(update,
+			"\tvar plan ${1}Model\n\tvar state ${1}Model\n${2}"+
+				"\tresp.Diagnostics.Append(req.State.Get(ctx, &state)...)\n")
+		// Use state.Id (known current value) not plan.Id (may be unknown).
+		fixed = strings.ReplaceAll(fixed, "plan.Id.ValueString()", "state.Id.ValueString()")
+
+		if err := os.WriteFile(path, []byte(strings.Replace(content, update, fixed, 1)), 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", path, err)
+		}
+		log.Printf("patched %s: Update uses state.Id for the request URL", path)
+		patched++
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if patched == 0 {
+		return fmt.Errorf("no resource Update used plan.Id; generator output may have changed")
 	}
 	return nil
 }
@@ -1642,9 +1747,13 @@ func init() {
 	rootCmd.AddCommand(generateCmd)
 }
 
-// patchPoolsResourceUpdate fixes the generated pools Update to use state.Id
-// for the PATCH URL instead of plan.Id, which is "(known after apply)" during
-// an update and produces an empty path (/pools/) that returns an HTML error.
+// patchPoolsResourceUpdate narrows the pools Update request body to
+// desired_count. PATCH /pools/{id} binds only that field (resizePoolInput), and
+// the strict Huma API rejects the full PoolView the generator sends.
+//
+// The other half of the historical pools fix — reading the id out of state
+// rather than the plan — is now patchResourceUpdateStateID and applies to every
+// resource, so it runs first and this anchors on its output.
 func patchPoolsResourceUpdate(outDir string) error {
 	file := filepath.Join(outDir, "internal", "provider", "pools_resource.go")
 	b, err := os.ReadFile(file)
@@ -1653,43 +1762,20 @@ func patchPoolsResourceUpdate(outDir string) error {
 	}
 	content := string(b)
 
-	const old = `func (r *PoolsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan PoolsModel
+	const old = "\treqBody := plan.ToClientModel()\n\n" +
+		"\trespBody, err := r.client.DoRequest(ctx, \"PATCH\", fmt.Sprintf(\"/pools/%v\", state.Id.ValueString()), reqBody)"
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	reqBody := plan.ToClientModel()
-
-	respBody, err := r.client.DoRequest(ctx, "PATCH", fmt.Sprintf("/pools/%v", plan.Id.ValueString()), reqBody)`
-
-	const patched = `func (r *PoolsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan PoolsModel
-	var state PoolsModel
-
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// Resize endpoint only accepts desired_count — not the full pool body.
-	resizeBody := map[string]int64{"desired_count": plan.DesiredCount.ValueInt64()}
-
-	// Use state.Id (known current value) not plan.Id (unknown during update).
-	respBody, err := r.client.DoRequest(ctx, "PATCH", fmt.Sprintf("/pools/%v", state.Id.ValueString()), resizeBody)`
+	const patched = "\t// The resize endpoint only accepts desired_count, not the full pool body.\n" +
+		"\tresizeBody := map[string]int64{\"desired_count\": plan.DesiredCount.ValueInt64()}\n\n" +
+		"\trespBody, err := r.client.DoRequest(ctx, \"PATCH\", fmt.Sprintf(\"/pools/%v\", state.Id.ValueString()), resizeBody)"
 
 	if !strings.Contains(content, old) {
-		log.Printf("note: pools_resource.go Update already patched or generator output changed; skipping")
-		return nil
+		return fmt.Errorf("%s: pools Update body not found in the expected shape; generator output may have changed", file)
 	}
-	patched2 := strings.Replace(content, old, patched, 1)
-	if err := os.WriteFile(file, []byte(patched2), 0o644); err != nil {
+	if err := os.WriteFile(file, []byte(strings.Replace(content, old, patched, 1)), 0o644); err != nil {
 		return fmt.Errorf("write %s: %w", file, err)
 	}
-	log.Printf("patched pools_resource.go: Update uses state.Id for PATCH URL")
+	log.Printf("patched pools_resource.go: Update sends only desired_count")
 	return nil
 }
 

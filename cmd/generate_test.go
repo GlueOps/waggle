@@ -511,3 +511,102 @@ func mustWrite(t *testing.T, path, content string) {
 		t.Fatalf("write %s: %v", path, err)
 	}
 }
+
+// generatedUpdate is the Update method the OpenAPI Generator emits for every
+// resource: the request URL is built from plan.Id, which is not guaranteed
+// known during an update.
+const generatedUpdate = `package provider
+
+func (r *SlotsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan SlotsModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	reqBody := plan.ToClientModel()
+
+	respBody, err := r.client.DoRequest(ctx, "PUT", fmt.Sprintf("/slots/%v", plan.Id.ValueString()), reqBody)
+	if err != nil {
+		resp.Diagnostics.AddError("Error updating slots", err.Error())
+		return
+	}
+}
+`
+
+func TestPatchResourceUpdateStateID(t *testing.T) {
+	dir := t.TempDir()
+	providerDir := filepath.Join(dir, "internal", "provider")
+	mustWrite(t, filepath.Join(providerDir, "slots_resource.go"), generatedUpdate)
+
+	if err := patchResourceUpdateStateID(dir); err != nil {
+		t.Fatalf("patchResourceUpdateStateID: %v", err)
+	}
+
+	b, err := os.ReadFile(filepath.Join(providerDir, "slots_resource.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	for _, want := range []string{
+		"var state SlotsModel",
+		"resp.Diagnostics.Append(req.State.Get(ctx, &state)...)",
+		`fmt.Sprintf("/slots/%v", state.Id.ValueString())`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "plan.Id.ValueString()") {
+		t.Errorf("plan.Id still used for the request URL:\n%s", got)
+	}
+	// The plan is still what the request body is built from.
+	if !strings.Contains(got, "reqBody := plan.ToClientModel()") {
+		t.Errorf("request body no longer built from the plan:\n%s", got)
+	}
+}
+
+// A resource whose Update never calls the API — the empty api_keys/auth/system
+// stubs — has no id to rewrite and must be left alone rather than erroring.
+func TestPatchResourceUpdateStateIDSkipsStubs(t *testing.T) {
+	const stub = `package provider
+
+func (r *AuthResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan AuthModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+`
+	dir := t.TempDir()
+	providerDir := filepath.Join(dir, "internal", "provider")
+	mustWrite(t, filepath.Join(providerDir, "auth_resource.go"), stub)
+	mustWrite(t, filepath.Join(providerDir, "slots_resource.go"), generatedUpdate)
+
+	if err := patchResourceUpdateStateID(dir); err != nil {
+		t.Fatalf("patchResourceUpdateStateID: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(providerDir, "auth_resource.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != stub {
+		t.Errorf("stub was rewritten:\n%s", b)
+	}
+}
+
+// The pass exists to catch a regression, so a generator template change that
+// removes the plan.Id usage entirely must fail rather than quietly no-op.
+func TestPatchResourceUpdateStateIDErrorsWhenNothingMatches(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "internal", "provider", "slots_resource.go"),
+		strings.ReplaceAll(generatedUpdate, "plan.Id.ValueString()", "state.Id.ValueString()"))
+
+	if err := patchResourceUpdateStateID(dir); err == nil {
+		t.Fatal("expected an error when no Update used plan.Id, got nil")
+	}
+}
