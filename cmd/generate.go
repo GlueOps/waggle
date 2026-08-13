@@ -1163,6 +1163,14 @@ func patchResourceImmutability(outDir, specPath string) error {
 					"remove the entry or fix the derivation", resource,
 			)
 		}
+		if isOverlayFile(resource + "_resource.go") {
+			// The overlay declares its own plan modifiers; injecting here would
+			// duplicate them. placements is the live case and is unreachable
+			// anyway (it has no create endpoint to derive from), so this is a
+			// guard for the next overlay rather than a live branch.
+			log.Printf("note: %s is a hand-authored overlay; plan modifiers left to it", resource)
+			continue
+		}
 		if _, managed := resourceSchemaRoles[resource]; !managed {
 			if len(immutable) > 0 {
 				log.Printf(
@@ -1281,9 +1289,9 @@ func patchResourceUpdateStateID(outDir string) error {
 		if d.IsDir() || !strings.HasSuffix(path, "_resource.go") {
 			return nil
 		}
-		// placements_resource.go is a hand-authored overlay keyed on a Required
-		// placement_id, which is always known.
-		if strings.HasSuffix(path, "placements_resource.go") {
+		// The overlays are keyed on a Required, always-known id rather than a
+		// computed one, so there is nothing to rewrite.
+		if isOverlayFile(path) {
 			return nil
 		}
 		b, err := os.ReadFile(path)
@@ -1359,6 +1367,28 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// overlayProviderFiles are the hand-authored files writeProviderOverlays lays
+// over the generator's output. They are already correct by construction, so the
+// patch passes must leave them alone: a pass that rewrites one either
+// double-applies a fix the overlay already carries, or silently reverts a
+// deliberate difference from the generated shape.
+//
+// The passes that skip them say so by consulting this list rather than testing
+// a filename inline, so adding an overlay does not mean remembering which
+// passes need a new exception. patchResourceSchemaRoles is the one deliberate
+// exception: it runs over placements_resource.go on purpose, to assert
+// idempotently that the overlay's attribute roles still match the table.
+var overlayProviderFiles = []string{
+	"pool_placements_data_source.go",
+	"slots_data_source.go",
+	"placements_resource.go",
+}
+
+// isOverlayFile reports whether path is one of the hand-authored overlays.
+func isOverlayFile(path string) bool {
+	return slices.Contains(overlayProviderFiles, filepath.Base(path))
 }
 
 // writeProviderOverlays drops hand-authored provider source files into the
@@ -1910,9 +1940,9 @@ func patchResourceRead404(outDir string) error {
 		if d.IsDir() || !strings.HasSuffix(path, "_resource.go") {
 			return nil
 		}
-		// placements_resource.go is a hand-authored overlay that already handles
-		// 404 correctly — skip it to avoid a double-injection.
-		if strings.HasSuffix(path, "placements_resource.go") {
+		// The overlays already handle 404 correctly; re-injecting would double
+		// the guard.
+		if isOverlayFile(path) {
 			return nil
 		}
 		b, err := os.ReadFile(path)
