@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/glueops/waggle/internal/database"
@@ -611,13 +612,24 @@ func (s *FleetService) DiscoverHypervisors(ctx context.Context, orgID, datacente
 	}
 
 	now := time.Now().UTC()
+	// Where each managed guest was actually found, node name -> vmids. Built
+	// during the sweep and applied afterwards so every hypervisor row exists
+	// (and carries fresh capacity) before any observation points at one.
+	residency := make(map[string][]int, len(nodes))
 	for _, n := range nodes {
 		// Capacity already committed to existing guests, so bookable space
 		// reflects reality rather than assuming an empty node. Best-effort:
 		// usage errors don't abort discovery of the rest of the node's data.
 		usage, uerr := client.NodeUsage(ctx, n.Name, managed)
 		if uerr != nil {
+			// Usage is unknown, not zero. Writing zero here would overwrite a
+			// previously correct ram_gb_used and make a full node look empty
+			// to the scheduler, so the *_used columns are left untouched and
+			// only the node's totals are refreshed.
+			log.Printf("DiscoverHypervisors: node %q usage unavailable, keeping last known *_used: %v", n.Name, uerr)
 			usage = proxmox.NodeUsage{}
+		} else {
+			residency[n.Name] = usage.Managed
 		}
 		hv := tenant.Hypervisor{
 			DatacenterID: dc.ID,
@@ -639,17 +651,103 @@ func (s *FleetService) DiscoverHypervisors(ctx context.Context, orgID, datacente
 			CPUOvercommitRatio: dc.EffectiveCPUOvercommitRatio(),
 			LastSyncedAt:       &now,
 		}
+		refresh := []string{
+			"cpu_total", "ram_gb_total", "disk_gb_total",
+			"last_synced_at", "updated_at",
+		}
+		if uerr == nil {
+			refresh = append(refresh, "cpu_used", "ram_gb_used", "disk_gb_used")
+		}
 		if err := db.WithContext(ctx).Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "datacenter_id"}, {Name: "name"}},
-			DoUpdates: clause.AssignmentColumns([]string{
-				"cpu_total", "ram_gb_total", "disk_gb_total",
-				"cpu_used", "ram_gb_used", "disk_gb_used",
-				"last_synced_at", "updated_at",
-			}),
+			Columns:   []clause.Column{{Name: "datacenter_id"}, {Name: "name"}},
+			DoUpdates: clause.AssignmentColumns(refresh),
 		}).Create(&hv).Error; err != nil {
 			return nil, fmt.Errorf("upsert discovered hypervisor %q: %w", n.Name, err)
 		}
 	}
 
+	if err := recordObservedResidency(ctx, db, dc.ID, residency); err != nil {
+		return nil, err
+	}
+
 	return s.ListHypervisors(ctx, orgID, &datacenterID)
+}
+
+// recordObservedResidency notes where discovery actually found each managed
+// guest, WITHOUT touching the booking.
+//
+// A placement is an assignment: a pool asks for N VMs of a slot, Waggle books
+// specific hypervisors, and the provisioning pipeline is obliged to build on
+// the ones it was given. placements.hypervisor_id is that promise, and it is
+// part of the pipeline's own Terraform state -- rewriting it server-side would
+// move a value Terraform reads, so the assignment is immutable here no matter
+// what the cluster says.
+//
+// What can be corrected is the accounting. A guest found on a node other than
+// its assignment is a violated booking, and until it is recorded the guest is
+// charged to a hypervisor that is not carrying it and is invisible on the one
+// that is -- discovery excludes managed vmids from ram_gb_used datacenter-wide,
+// so it contributes nothing there either. The host really running it is then
+// oversold by exactly its slot size. Writing observed_hypervisor_id lets
+// consumedByHypervisor charge the guest where it actually lives while leaving
+// the promise on the row for an operator to reconcile deliberately.
+//
+// An observation is also cleared when a guest turns up on its assignment again,
+// so the column never carries a stale violation.
+//
+// residency maps node name to the managed vmids found resident on it. Nodes
+// whose usage lookup failed are absent (not empty), so an unreachable node is
+// never mistaken for one hosting nothing.
+func recordObservedResidency(ctx context.Context, db *gorm.DB, dcID uuid.UUID, residency map[string][]int) error {
+	for node, vmids := range residency {
+		if len(vmids) == 0 {
+			continue
+		}
+		var hvID uuid.UUID
+		if err := db.WithContext(ctx).
+			Model(&tenant.Hypervisor{}).
+			Where("datacenter_id = ? AND name = ?", dcID, node).
+			Pluck("id", &hvID).Error; err != nil {
+			return fmt.Errorf("resolve hypervisor %q: %w", node, err)
+		}
+		if hvID == uuid.Nil {
+			continue
+		}
+
+		// Scoped to hypervisors in THIS datacenter: vmid is unique per Proxmox
+		// cluster, not per tenant database, so an unscoped match could attach
+		// an observation to a placement in another datacenter on a collision.
+		inDC := db.Model(&tenant.Hypervisor{}).Select("id").Where("datacenter_id = ?", dcID)
+		scoped := func() *gorm.DB {
+			return db.WithContext(ctx).
+				Model(&tenant.Placement{}).
+				Where("vmid IN ?", vmids).
+				Where("hypervisor_id IN (?)", inDC)
+		}
+
+		// Found where it was booked: drop any previous violation.
+		if err := scoped().
+			Where("hypervisor_id = ?", hvID).
+			Where("observed_hypervisor_id IS NOT NULL").
+			UpdateColumn("observed_hypervisor_id", nil).Error; err != nil {
+			return fmt.Errorf("clear observed hypervisor for %q: %w", node, err)
+		}
+
+		// Found somewhere other than its assignment.
+		res := scoped().
+			Where("hypervisor_id <> ?", hvID).
+			Where("observed_hypervisor_id IS DISTINCT FROM ?", hvID).
+			UpdateColumn("observed_hypervisor_id", hvID)
+		if res.Error != nil {
+			return fmt.Errorf("record observed hypervisor %q: %w", node, res.Error)
+		}
+		if res.RowsAffected > 0 {
+			// Not routine: Waggle booked these guests onto a different node and
+			// the pipeline was obliged to build there. Capacity now follows the
+			// guest, but the booking itself is still violated and only an
+			// operator can decide what to do about it.
+			log.Printf("DiscoverHypervisors: WARNING: %d guest(s) found on %q were assigned to a different hypervisor; capacity re-attributed, assignment left intact -- investigate the provisioning pipeline", res.RowsAffected, node)
+		}
+	}
+	return nil
 }

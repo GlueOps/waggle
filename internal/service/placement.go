@@ -188,15 +188,24 @@ func consumedByHypervisor(db *gorm.DB, hvIDs []uuid.UUID) (map[uuid.UUID]consume
 		Disk         int
 	}
 	var rows []row
+	// Charge each placement to where its guest ACTUALLY is. observed_hypervisor_id
+	// is set by discovery when it finds a guest on a hypervisor other than the
+	// one it was assigned; it is NULL for the overwhelming majority of rows,
+	// which sit where they were booked. Grouping on the assignment instead
+	// would credit the slot cost to a node that is not carrying the guest and
+	// leave the node that IS carrying it looking empty -- the node is then
+	// oversold, because discovery also excludes managed vmids from
+	// ram_gb_used, so the guest appears nowhere at all.
+	const homeHV = "COALESCE(placements.observed_hypervisor_id, placements.hypervisor_id)"
 	if err := db.Table("placements").
-		Select("placements.hypervisor_id AS hypervisor_id, "+
+		Select(homeHV+" AS hypervisor_id, "+
 			"COALESCE(SUM(slots.vcpu),0) AS cpu, "+
 			"COALESCE(SUM(slots.ram_gb),0) AS ram, "+
 			"COALESCE(SUM(slots.disk_gb),0) AS disk").
 		Joins("JOIN pools ON pools.id = placements.pool_id").
 		Joins("JOIN slots ON slots.id = pools.slot_id").
-		Where("placements.hypervisor_id IN ?", hvIDs).
-		Group("placements.hypervisor_id").
+		Where(homeHV+" IN ?", hvIDs).
+		Group(homeHV).
 		Scan(&rows).Error; err != nil {
 		return nil, fmt.Errorf("compute consumed capacity: %w", err)
 	}

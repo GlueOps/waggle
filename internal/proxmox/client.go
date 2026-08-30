@@ -147,6 +147,14 @@ type NodeUsage struct {
 	MemBytes  int64 // sum of guest configured RAM
 	DiskBytes int64 // sum of guest configured disk
 	Guests    int
+	// Managed is the set of excluded (Waggle-managed) vmids actually found
+	// resident on this node. It is the only evidence Waggle ever gets that a
+	// guest is not on the hypervisor it was assigned: backfill reports the vmid
+	// but never the node, and Waggle never touches the cluster itself. Without
+	// it a guest built in the wrong place stays charged to the node its
+	// placement names and is invisible on the node hosting it, because the
+	// exclude set skipped it here.
+	Managed []int
 }
 
 // guestRow is the shared shape of /qemu and /lxc list entries we sum over.
@@ -158,26 +166,38 @@ type guestRow struct {
 }
 
 // NodeUsage sums allocated resources across a node's QEMU VMs and LXC
-// containers. A guest endpoint that errors (e.g. permissions) contributes
-// nothing rather than failing the whole discovery.
+// containers.
 //
-// Guests whose vmid is in exclude are skipped: those are VMs Waggle already
-// accounts for via its placement ledger, so counting them here too would
-// double-subtract their capacity at scheduling time. A nil exclude counts
-// every guest. vmid is cluster-unique in Proxmox, so a flat set suffices —
-// no per-node keying is needed.
+// Guests whose vmid is in exclude are skipped for the capacity sums: those are
+// VMs Waggle already accounts for via its placement ledger, so counting them
+// here too would double-subtract their capacity at scheduling time. A nil
+// exclude counts every guest. vmid is cluster-unique in Proxmox, so a flat set
+// suffices — no per-node keying is needed. Skipped vmids are still reported in
+// NodeUsage.Managed so the caller can tell WHERE each managed guest actually
+// runs, which is the only signal that catches a VM migrated out from under its
+// placement row.
+//
+// A guest endpoint that errors (e.g. permissions, timeout) contributes nothing
+// to the sums; if EVERY kind fails the node's usage is unknowable and an error
+// is returned rather than a spuriously low zero. Reporting zero as though it
+// were measured is what lets discovery overwrite a correct ram_gb_used with a
+// value that makes a full node look empty.
 func (c *Client) NodeUsage(ctx context.Context, node string, exclude map[int]struct{}) (NodeUsage, error) {
 	var usage NodeUsage
-	for _, kind := range []string{"qemu", "lxc"} {
+	kinds := []string{"qemu", "lxc"}
+	var errs []error
+	for _, kind := range kinds {
 		var payload struct {
 			Data []guestRow `json:"data"`
 		}
 		if err := c.getJSON(ctx, "/api2/json/nodes/"+node+"/"+kind, &payload); err != nil {
-			// Tolerate per-kind failures; report only if both are unusable.
+			// Tolerate per-kind failures; report only if every kind is unusable.
+			errs = append(errs, fmt.Errorf("%s: %w", kind, err))
 			continue
 		}
 		for _, g := range payload.Data {
 			if _, managed := exclude[g.VMID]; managed {
+				usage.Managed = append(usage.Managed, g.VMID)
 				continue
 			}
 			usage.VCPU += g.CPUs
@@ -185,6 +205,9 @@ func (c *Client) NodeUsage(ctx context.Context, node string, exclude map[int]str
 			usage.DiskBytes += g.MaxDisk
 			usage.Guests++
 		}
+	}
+	if len(errs) == len(kinds) {
+		return NodeUsage{}, fmt.Errorf("proxmox: node %s: no guest listing succeeded: %w", node, errors.Join(errs...))
 	}
 	return usage, nil
 }
