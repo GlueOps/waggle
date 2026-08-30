@@ -703,16 +703,20 @@ func recordObservedResidency(ctx context.Context, db *gorm.DB, dcID uuid.UUID, r
 		if len(vmids) == 0 {
 			continue
 		}
-		var hvID uuid.UUID
+		// Pluck needs a SLICE destination. Passing a bare uuid.UUID ([16]byte)
+		// makes database/sql try to scan the UUID string into a uint8 and fail
+		// the whole sweep, which is exactly what shipped in v0.2.6.
+		var ids []uuid.UUID
 		if err := db.WithContext(ctx).
 			Model(&tenant.Hypervisor{}).
 			Where("datacenter_id = ? AND name = ?", dcID, node).
-			Pluck("id", &hvID).Error; err != nil {
+			Pluck("id", &ids).Error; err != nil {
 			return fmt.Errorf("resolve hypervisor %q: %w", node, err)
 		}
-		if hvID == uuid.Nil {
+		if len(ids) == 0 {
 			continue
 		}
+		hvID := ids[0]
 
 		// Scoped to hypervisors in THIS datacenter: vmid is unique per Proxmox
 		// cluster, not per tenant database, so an unscoped match could attach
