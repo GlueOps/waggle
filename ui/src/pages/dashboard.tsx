@@ -74,27 +74,28 @@ export function DashboardPage() {
   const placements = plQ.data?.items ?? []
   const pools = poolQ.data?.items ?? []
 
-  // Capacity Waggle has committed per hypervisor: EVERY placement, whether or
-  // not it has been provisioned yet.
+  // Capacity Waggle has committed per hypervisor, DERIVED from the server's own
+  // bookable figure rather than recomputed here:
   //
-  // This used to skip placements with a vmid, because discovery counted those
-  // VMs as real guests in *_used and counting them here too would double up.
-  // Discovery now excludes vmids Waggle tracks (so the ledger is the single
-  // source for its own VMs), which inverted the rule: skipping them here left
-  // provisioned placements in NEITHER *_used NOR this map, and their capacity
-  // vanished from the dashboard entirely.
+  //   pending = total - reserved - used - bookable
   //
-  // Counting all placements mirrors consumedByHypervisor on the server, so the
-  // meter agrees with cpu_bookable.
-  const pendingByHv = new Map<string, { cpu: number; ram: number; disk: number }>()
-  for (const p of placements) {
-    const cur = pendingByHv.get(p.hypervisor_name) ?? { cpu: 0, ram: 0, disk: 0 }
-    cur.cpu += p.vcpu
-    cur.ram += p.ram_gb
-    cur.disk += p.disk_gb
-    pendingByHv.set(p.hypervisor_name, cur)
-  }
-  const pend = (h: HypervisorView) => pendingByHv.get(h.name) ?? { cpu: 0, ram: 0, disk: 0 }
+  // This used to sum placements grouped by hypervisor_name, which duplicated
+  // consumedByHypervisor on the client. That duplication has now drifted twice.
+  // Most recently the server began charging a placement to the hypervisor its
+  // guest was actually OBSERVED on rather than the one it was assigned to; the
+  // dashboard kept grouping by the assignment, so a node carrying a guest it
+  // was never assigned looked emptier here than the API said it was, and the
+  // node that lost one looked fuller.
+  //
+  // Deriving from bookable cannot drift: the arithmetic lives in exactly one
+  // place, on the server, and the meter is a view of it. A placement's
+  // hypervisor_name is the ASSIGNMENT and is deliberately not enough to compute
+  // capacity from.
+  const pend = (h: HypervisorView) => ({
+    cpu: h.cpu_effective_total - h.cpu_reserved - h.cpu_used - h.cpu_bookable,
+    ram: h.ram_gb_total - h.ram_gb_reserved - h.ram_gb_used - h.ram_gb_bookable,
+    disk: h.disk_gb_total - h.disk_gb_reserved - h.disk_gb_used - h.disk_gb_bookable,
+  })
 
   const seg = (
     pick: (h: HypervisorView) => { reserved: number; used: number; total: number; pending: number }
