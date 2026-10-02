@@ -2453,12 +2453,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint-plugin-react-refresh@npm:0.5.3":
-  version: 0.5.3
-  resolution: "eslint-plugin-react-refresh@npm:0.5.3"
+"eslint-plugin-react-refresh@npm:0.5.6":
+  version: 0.5.6
+  resolution: "eslint-plugin-react-refresh@npm:0.5.6"
   peerDependencies:
     eslint: ^9 || ^10
-  checksum: 10/94436271cefc6777b750a14166f107a01b5708c4d0bcd444d1f3802624aa6d29d0e636cd1b2db9fab77910a5d1b1679491734641064855b1bc8ab3329c173bff
+  checksum: 10/eb4e1bece1cf848c5ee349959537ce9b2dc666c1c09b4d006746afee837e6bdc905a7bb47336ad599bf5514d91ad105398b3e9cbf23547a0763fdb883f0aed2a
   languageName: node
   linkType: hard
 
@@ -3679,7 +3679,7 @@ __metadata:
     clsx: "npm:^2.1.1"
     eslint: "npm:10.8.0"
     eslint-plugin-react-hooks: "npm:7.1.1"
-    eslint-plugin-react-refresh: "npm:0.5.3"
+    eslint-plugin-react-refresh: "npm:0.5.6"
     globals: "npm:17.8.0"
     lucide-react: "npm:^1.22.0"
     radix-ui: "npm:^1.6.0"
