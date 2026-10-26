@@ -2,7 +2,7 @@
   "author": "OpenAPI-Generator",
   "description": "OpenAPI client for @glueops/waggle-sdk",
   "devDependencies": {
-    "typescript": "^6.0.0"
+    "typescript": "6.0.3"
   },
   "main": "./dist/index.js",
   "module": "./dist/esm/index.js",
