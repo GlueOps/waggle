@@ -22,7 +22,7 @@ RUN yarn build
 # ---- Stage 2: build the Go binary ---------------------------------------
 # CGO is disabled so the result is a fully static binary for a scratch/distroless
 # runtime. Version metadata is injected via -ldflags.
-FROM golang:1.26-bookworm@sha256:1ecb7edf62a0408027bd5729dfd6b1b8766e578e8df93995b225dfd0944eb651 AS build
+FROM golang:1.27-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS build
 WORKDIR /src
 
 # Download modules first for layer caching.
