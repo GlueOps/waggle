@@ -3108,11 +3108,15 @@ __metadata:
   linkType: hard
 
 "lucide-react@npm:^1.22.0":
-  version: 1.28.0
-  resolution: "lucide-react@npm:1.28.0"
+  version: 1.70.0
+  resolution: "lucide-react@npm:1.70.0"
   peerDependencies:
+    "@types/react": "*"
     react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
-  checksum: 10/8797d879a4a7767565807333b430bda73d935274fd8ec9fe6f2d6932bb973085684bbf305f03c74aab8ba9732ae2c699868a0d109874be55a2bbc36d8c100dec
+  peerDependenciesMeta:
+    "@types/react":
+      optional: true
+  checksum: 10/a087cbf87c8765373c32bf2b64511029968b16f543d38013ac65e89b56eba3a6e99466aa5bf2d71762eb5f0fb06d8b221070c4c345c5cbaa2890601a4a16518b
   languageName: node
   linkType: hard
 
