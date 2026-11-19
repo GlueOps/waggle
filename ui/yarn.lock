@@ -3549,9 +3549,9 @@ __metadata:
   linkType: hard
 
 "tailwind-merge@npm:^3.6.0":
-  version: 3.6.0
-  resolution: "tailwind-merge@npm:3.6.0"
-  checksum: 10/1da88698b6d878c391ab83064346e4b5b038d1b519d90825044df4b096971522c12253c7d6ab586c9da04e2039ba46573696138ea3d19c685d3c236f1f892899
+  version: 3.7.1
+  resolution: "tailwind-merge@npm:3.7.1"
+  checksum: 10/26c998c8619e70b51f4815cfc18957959490ac09f7d50b9b15e3453ec9aaa1355c5e88cfc3958b1290378cbadfc5dd58332cc65f8f05ee65cebe0bdfb7e780a7
   languageName: node
   linkType: hard
 
