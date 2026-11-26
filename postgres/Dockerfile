@@ -1,4 +1,4 @@
-FROM postgres:18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
+FROM postgres:19@sha256:4ea94de574c17f0372722806c949757050fbb1cd7648410fe45d6bba275cc00e
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
